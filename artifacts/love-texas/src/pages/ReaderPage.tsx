@@ -1,10 +1,10 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'wouter';
 import { Book, getBook, getProgress, saveProgress, addWordToDictionary } from '@/lib/storage';
 import { paginateBook } from '@/lib/paginator';
 import { useReaderSettings } from '@/contexts/ReaderSettingsContext';
 import { getFontCss } from '@/lib/fonts';
-import { ArrowLeft, ChevronLeft, ChevronRight, Settings, X, Plus, Loader2 } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Settings, X, Plus, Loader2, List, BookOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { lookupWord } from '@/lib/dictionary';
 import { speak } from '@/lib/speech';
@@ -18,10 +18,33 @@ async function googleTranslate(text: string, target = 'ru'): Promise<string> {
   return (json[0] as any[]).map((c: any) => c[0]).join('');
 }
 
+/** Split paragraph text into individual sentences */
+function splitSentences(text: string): string[] {
+  const results: string[] = [];
+  // Match sequences ending with . ! ? (including quotes/ellipsis after)
+  const re = /[^.!?]*(?:[.!?]+["'»]?\s*)/g;
+  let lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (m[0].trim()) results.push(m[0]);
+    lastIndex = re.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    const tail = text.slice(lastIndex).trim();
+    if (tail) results.push(tail);
+  }
+  return results.length > 0 ? results : [text];
+}
+
 interface PageData {
   title: string;
   paragraphs: string[];
   isChapterStart: boolean;
+}
+
+interface TocEntry {
+  title: string;
+  pageIdx: number;
 }
 
 export function ReaderPage() {
@@ -43,12 +66,18 @@ export function ReaderPage() {
     translating: boolean;
   } | null>(null);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const translateAbortRef = useRef<AbortController | null>(null);
 
   // Sentence translation panel
   const [selectedSentence, setSelectedSentence] = useState<string | null>(null);
   const [sentenceTranslation, setSentenceTranslation] = useState<string | null>(null);
   const [translating, setTranslating] = useState(false);
+
+  // TOC panel
+  const [showToc, setShowToc] = useState(false);
+
+  // Page jump (in footer)
+  const [jumpValue, setJumpValue] = useState('');
+  const [editingPage, setEditingPage] = useState(false);
 
   const saveProgressRef = useRef(saveProgress);
   saveProgressRef.current = saveProgress;
@@ -81,11 +110,45 @@ export function ReaderPage() {
     return () => clearTimeout(timer);
   }, [currentPageIdx, book, pages.length, id]);
 
-  const handleNext = useCallback(() => { if (currentPageIdx < pages.length - 1) setCurrentPageIdx(p => p + 1); }, [currentPageIdx, pages.length]);
-  const handlePrev = useCallback(() => { if (currentPageIdx > 0) setCurrentPageIdx(p => p - 1); }, [currentPageIdx]);
+  // Build TOC from pages
+  const tocEntries: TocEntry[] = useMemo(() => {
+    const entries: TocEntry[] = [];
+    pages.forEach((p, idx) => {
+      if (p.isChapterStart) entries.push({ title: p.title, pageIdx: idx });
+    });
+    return entries;
+  }, [pages]);
+
+  // Which chapter is active
+  const activeChapterIdx = useMemo(() => {
+    let active = 0;
+    for (let i = 0; i < tocEntries.length; i++) {
+      if (tocEntries[i].pageIdx <= currentPageIdx) active = i;
+    }
+    return active;
+  }, [tocEntries, currentPageIdx]);
+
+  const handleNext = useCallback(() => {
+    if (currentPageIdx < pages.length - 1) {
+      setCurrentPageIdx(p => p + 1);
+      setSelectedSentence(null);
+      setSentenceTranslation(null);
+    }
+  }, [currentPageIdx, pages.length]);
+
+  const handlePrev = useCallback(() => {
+    if (currentPageIdx > 0) {
+      setCurrentPageIdx(p => p - 1);
+      setSelectedSentence(null);
+      setSentenceTranslation(null);
+    }
+  }, [currentPageIdx]);
 
   useEffect(() => {
-    const fn = (e: KeyboardEvent) => { if (e.key === 'ArrowRight') handleNext(); if (e.key === 'ArrowLeft') handlePrev(); };
+    const fn = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') handleNext();
+      if (e.key === 'ArrowLeft') handlePrev();
+    };
     window.addEventListener('keydown', fn);
     return () => window.removeEventListener('keydown', fn);
   }, [handleNext, handlePrev]);
@@ -98,15 +161,12 @@ export function ReaderPage() {
     clearTimeout(hoverTimeoutRef.current);
 
     hoverTimeoutRef.current = setTimeout(async () => {
-      // Show tooltip immediately with loading state
       const entry = lookupWord(word);
       if (entry) {
         setHoveredWord({ word, x: rect.left + rect.width / 2, y: rect.top - 10, translation: entry.t, pos: entry.pos, translating: false });
         return;
       }
-      // Unknown word — show loading, then translate
       setHoveredWord({ word, x: rect.left + rect.width / 2, y: rect.top - 10, translation: null, pos: '', translating: true });
-      translateAbortRef.current?.abort();
       try {
         const result = await googleTranslate(word);
         setHoveredWord(prev => prev?.word === word ? { ...prev, translation: result, translating: false } : prev);
@@ -129,7 +189,9 @@ export function ReaderPage() {
   };
 
   // ── Sentence click ──────────────────────────────────────────────────────────
-  const handleParagraphClick = async (text: string) => {
+  const handleSentenceClick = async (sentence: string) => {
+    const text = sentence.trim();
+    if (!text) return;
     setHoveredWord(null);
     setSelectedSentence(text);
     setSentenceTranslation(null);
@@ -142,6 +204,19 @@ export function ReaderPage() {
     } finally {
       setTranslating(false);
     }
+  };
+
+  // ── Page jump ───────────────────────────────────────────────────────────────
+  const handleJumpSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const n = parseInt(jumpValue, 10);
+    if (!isNaN(n) && n >= 1 && n <= pages.length) {
+      setCurrentPageIdx(n - 1);
+      setSelectedSentence(null);
+      setSentenceTranslation(null);
+    }
+    setEditingPage(false);
+    setJumpValue('');
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
@@ -161,11 +236,19 @@ export function ReaderPage() {
     <div className="min-h-screen bg-background text-foreground flex flex-col selection:bg-primary/20">
       {/* Header */}
       <header className="h-14 flex items-center justify-between px-4 border-b border-border/40 shrink-0 sticky top-0 bg-background/90 backdrop-blur-md z-20">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors p-2 rounded-full hover:bg-muted">
             <ArrowLeft size={20} />
           </Link>
-          <div className="hidden md:block">
+          {/* TOC button */}
+          <button
+            onClick={() => setShowToc(v => !v)}
+            className={`p-2 rounded-full transition-colors ${showToc ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+            title="Table of Contents"
+          >
+            <List size={20} />
+          </button>
+          <div className="hidden md:block ml-1">
             <h1 className="font-bold text-sm leading-tight">{book.title}</h1>
             <p className="text-xs text-muted-foreground">{book.author}</p>
           </div>
@@ -182,8 +265,89 @@ export function ReaderPage() {
       </header>
 
       <div className="flex flex-1 overflow-hidden relative">
+        {/* TOC Panel (left) */}
+        <AnimatePresence>
+          {showToc && (
+            <motion.aside
+              key="toc"
+              initial={{ x: -320 }}
+              animate={{ x: 0 }}
+              exit={{ x: -320 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+              className="fixed left-0 top-14 bottom-0 w-[300px] bg-card border-r border-border flex flex-col z-30 shadow-xl"
+            >
+              <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
+                <span className="font-semibold text-sm flex items-center gap-2">
+                  <BookOpen size={15} className="text-primary" />
+                  Оглавление
+                </span>
+                <button
+                  onClick={() => setShowToc(false)}
+                  className="p-1.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Chapter list */}
+              <div className="flex-1 overflow-y-auto py-2">
+                {tocEntries.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">Нет глав</p>
+                ) : (
+                  tocEntries.map((entry, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        setCurrentPageIdx(entry.pageIdx);
+                        setSelectedSentence(null);
+                        setSentenceTranslation(null);
+                        setShowToc(false);
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-muted/70 flex items-start gap-3 ${
+                        i === activeChapterIdx ? 'text-primary font-semibold bg-primary/5' : 'text-foreground/80'
+                      }`}
+                    >
+                      <span className="text-xs text-muted-foreground mt-0.5 shrink-0 w-5 text-right">{i + 1}</span>
+                      <span className="leading-snug">{entry.title || `Chapter ${i + 1}`}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+
+              {/* Page jump */}
+              <div className="p-4 border-t border-border shrink-0">
+                <p className="text-xs text-muted-foreground mb-2">Перейти на страницу</p>
+                <form onSubmit={handleJumpSubmit} className="flex gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={pages.length}
+                    placeholder={`1 – ${pages.length}`}
+                    value={jumpValue}
+                    onChange={e => setJumpValue(e.target.value)}
+                    className="flex-1 text-sm border border-border rounded-lg px-3 py-2 bg-background focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-primary text-primary-foreground text-sm rounded-lg font-medium hover:bg-primary/90 transition-colors"
+                  >
+                    →
+                  </button>
+                </form>
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  Сейчас: {currentPageIdx + 1} / {pages.length}
+                </p>
+              </div>
+            </motion.aside>
+          )}
+        </AnimatePresence>
+
         {/* Reader */}
-        <main className={`flex-1 relative flex items-center justify-center overflow-hidden transition-all duration-300 ${selectedSentence ? 'mr-[360px]' : ''}`}>
+        <main
+          className={`flex-1 relative flex items-center justify-center overflow-hidden transition-all duration-300 ${
+            selectedSentence ? 'mr-[360px]' : ''
+          } ${showToc ? 'ml-[300px]' : ''}`}
+        >
           <button onClick={handlePrev} className="absolute left-0 top-0 bottom-0 w-[8%] md:w-16 hover:bg-foreground/[0.02] flex items-center justify-center transition-colors text-transparent hover:text-foreground/20 z-10">
             <ChevronLeft size={36} />
           </button>
@@ -199,46 +363,57 @@ export function ReaderPage() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.25 }}
-                className="space-y-6"
                 style={{ fontSize: `${settings.fontSize}px`, lineHeight: settings.lineHeight, fontFamily: fontCss }}
               >
                 {/* Chapter title only on first page of each chapter */}
-                {page.isChapterStart && (
-                  <h2 className="font-serif text-center font-bold mb-8 text-primary/60 text-[1.1em]">
+                {page.isChapterStart && page.title && (
+                  <h2 className="font-serif text-center font-bold mb-6 text-primary/60 text-[1.1em]">
                     {page.title}
                   </h2>
                 )}
 
-                {page.paragraphs.map((para, i) => (
-                  <p
-                    key={i}
-                    className="text-foreground/90 text-justify cursor-pointer rounded-lg px-2 -mx-2 hover:bg-primary/5 transition-colors"
-                    title="Click to translate paragraph"
-                    onClick={() => handleParagraphClick(para)}
-                  >
-                    {para.split(/(\s+)/).map((token, wi) => {
-                      if (token.trim() === '') return <span key={wi}>{token}</span>;
-                      const clean = token.replace(/[.,!?;:"'()[\]{}—…«»]/g, '');
-                      return (
-                        <span
-                          key={wi}
-                          className="hover:bg-primary/25 rounded px-[1px] transition-colors cursor-default"
-                          onMouseEnter={e => { e.stopPropagation(); handleWordMouseEnter(e, clean); }}
-                          onMouseLeave={handleWordMouseLeave}
-                          onClick={e => e.stopPropagation()}
-                        >
-                          {token}
-                        </span>
-                      );
-                    })}
-                  </p>
-                ))}
+                {/* Paragraphs — split into sentences, each sentence clickable */}
+                <div className="space-y-2">
+                  {page.paragraphs.map((para, pi) => {
+                    const sentences = splitSentences(para);
+                    return (
+                      <p key={pi} className="text-foreground/90 text-justify">
+                        {sentences.map((sentence, si) => (
+                          <span
+                            key={si}
+                            className={`rounded cursor-pointer transition-colors hover:bg-primary/8 ${
+                              selectedSentence === sentence.trim() ? 'bg-primary/12' : ''
+                            }`}
+                            title="Click to translate"
+                            onClick={() => handleSentenceClick(sentence)}
+                          >
+                            {sentence.split(/(\s+)/).map((token, wi) => {
+                              if (token.trim() === '') return <span key={wi}>{token}</span>;
+                              const clean = token.replace(/[.,!?;:"'()[\]{}—…«»]/g, '');
+                              return (
+                                <span
+                                  key={wi}
+                                  className="hover:bg-primary/25 rounded px-[1px] transition-colors cursor-default"
+                                  onMouseEnter={e => { e.stopPropagation(); handleWordMouseEnter(e, clean); }}
+                                  onMouseLeave={handleWordMouseLeave}
+                                  onClick={e => e.stopPropagation()}
+                                >
+                                  {token}
+                                </span>
+                              );
+                            })}
+                          </span>
+                        ))}
+                      </p>
+                    );
+                  })}
+                </div>
               </motion.div>
             </AnimatePresence>
           </div>
         </main>
 
-        {/* Sentence translation panel */}
+        {/* Sentence translation panel (right) */}
         <AnimatePresence>
           {selectedSentence && (
             <motion.aside
@@ -251,8 +426,10 @@ export function ReaderPage() {
             >
               <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
                 <span className="font-semibold text-sm">Перевод предложения</span>
-                <button onClick={() => { setSelectedSentence(null); setSentenceTranslation(null); }}
-                  className="p-1.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground">
+                <button
+                  onClick={() => { setSelectedSentence(null); setSentenceTranslation(null); }}
+                  className="p-1.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground"
+                >
                   <X size={16} />
                 </button>
               </div>
@@ -274,8 +451,39 @@ export function ReaderPage() {
         </AnimatePresence>
       </div>
 
-      <footer className="h-8 shrink-0 flex items-center justify-center text-xs text-muted-foreground border-t border-border/30">
-        Page {currentPageIdx + 1} of {pages.length}
+      {/* Footer with page indicator + clickable jump */}
+      <footer className="h-9 shrink-0 flex items-center justify-center gap-3 text-xs text-muted-foreground border-t border-border/30">
+        <button onClick={handlePrev} disabled={currentPageIdx === 0} className="p-1 hover:text-foreground disabled:opacity-30 transition-colors">
+          <ChevronLeft size={14} />
+        </button>
+
+        {editingPage ? (
+          <form onSubmit={handleJumpSubmit} className="flex items-center gap-1">
+            <input
+              autoFocus
+              type="number"
+              min={1}
+              max={pages.length}
+              value={jumpValue}
+              onChange={e => setJumpValue(e.target.value)}
+              onBlur={() => { setEditingPage(false); setJumpValue(''); }}
+              className="w-16 text-center text-xs border border-border rounded px-2 py-0.5 bg-background focus:outline-none focus:ring-1 focus:ring-primary/50"
+            />
+            <span>/ {pages.length}</span>
+          </form>
+        ) : (
+          <button
+            onClick={() => { setEditingPage(true); setJumpValue(String(currentPageIdx + 1)); }}
+            className="hover:text-foreground transition-colors hover:bg-muted px-2 py-0.5 rounded"
+            title="Click to jump to page"
+          >
+            Page {currentPageIdx + 1} of {pages.length}
+          </button>
+        )}
+
+        <button onClick={handleNext} disabled={currentPageIdx === pages.length - 1} className="p-1 hover:text-foreground disabled:opacity-30 transition-colors">
+          <ChevronRight size={14} />
+        </button>
       </footer>
 
       {/* Word tooltip */}

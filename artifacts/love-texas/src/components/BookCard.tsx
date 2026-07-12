@@ -25,9 +25,7 @@ export function BookCard({ book, progress = 0, onDelete }: BookCardProps) {
     e.preventDefault();
     e.stopPropagation();
     if (book.id !== undefined && onDelete) {
-      if (window.confirm(`Delete "${book.title}"?`)) {
-        onDelete(book.id);
-      }
+      onDelete(book.id);
     }
   };
 

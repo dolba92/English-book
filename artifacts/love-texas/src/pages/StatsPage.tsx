@@ -24,39 +24,48 @@ export function StatsPage() {
   }, []);
 
   if (loading || !stats) {
-    return <div className="p-10 flex justify-center"><div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin"></div></div>;
+    return <div className="p-10 flex justify-center"><div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin" /></div>;
   }
 
   const daysActive = Math.max(1, Math.ceil((Date.now() - stats.firstUsed) / (1000 * 60 * 60 * 24)));
 
+  // Склонение "день / дня / дней"
+  const dayWord = (n: number) => {
+    const mod10 = n % 10;
+    const mod100 = n % 100;
+    if (mod10 === 1 && mod100 !== 11) return 'день';
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'дня';
+    return 'дней';
+  };
+
   const cards = [
-    { label: 'Books Read', value: stats.totalBooksRead, icon: BookOpen, color: 'text-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/30' },
-    { label: 'Pages Turned', value: stats.totalPagesRead, icon: BookOpen, color: 'text-indigo-500', bg: 'bg-indigo-100 dark:bg-indigo-900/30' },
-    { label: 'Words Learned', value: wordsCount, icon: BookMarked, color: 'text-pink-500', bg: 'bg-pink-100 dark:bg-pink-900/30' },
-    { label: 'Trainings Done', value: stats.totalTrainingsDone, icon: Brain, color: 'text-orange-500', bg: 'bg-orange-100 dark:bg-orange-900/30' },
+    { label: 'Книг прочитано',   value: booksCount,               icon: BookOpen,   color: 'text-blue-500',   bg: 'bg-blue-100 dark:bg-blue-900/30' },
+    { label: 'Страниц перевёрнуто', value: stats.totalPagesRead,  icon: BookOpen,   color: 'text-indigo-500', bg: 'bg-indigo-100 dark:bg-indigo-900/30' },
+    { label: 'Слов в словаре',   value: wordsCount,               icon: BookMarked, color: 'text-pink-500',   bg: 'bg-pink-100 dark:bg-pink-900/30' },
+    { label: 'Тренировок',       value: stats.totalTrainingsDone, icon: Brain,      color: 'text-orange-500', bg: 'bg-orange-100 dark:bg-orange-900/30' },
   ];
 
-  // Mock data for chart
+  // Mock chart data
   const chartData = [
-    { name: 'Mon', words: Math.max(0, wordsCount - 15) },
-    { name: 'Tue', words: Math.max(0, wordsCount - 10) },
-    { name: 'Wed', words: Math.max(0, wordsCount - 8) },
-    { name: 'Thu', words: Math.max(0, wordsCount - 5) },
-    { name: 'Fri', words: Math.max(0, wordsCount - 2) },
-    { name: 'Sat', words: wordsCount },
-    { name: 'Sun', words: wordsCount + 1 }, // projected
+    { name: 'Пн', words: Math.max(0, wordsCount - 15) },
+    { name: 'Вт', words: Math.max(0, wordsCount - 10) },
+    { name: 'Ср', words: Math.max(0, wordsCount - 8) },
+    { name: 'Чт', words: Math.max(0, wordsCount - 5) },
+    { name: 'Пт', words: Math.max(0, wordsCount - 2) },
+    { name: 'Сб', words: wordsCount },
+    { name: 'Вс', words: wordsCount + 1 },
   ];
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-6 md:p-10 max-w-6xl mx-auto">
       <div className="mb-10">
-        <h1 className="text-3xl font-serif font-bold text-foreground">Your Journey</h1>
-        <p className="text-muted-foreground mt-1">Learning English for {daysActive} days</p>
+        <h1 className="text-3xl font-serif font-bold text-foreground">Ваш прогресс</h1>
+        <p className="text-muted-foreground mt-1">Изучаю английский уже {daysActive} {dayWord(daysActive)}</p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
         {cards.map((card, i) => (
-          <motion.div 
+          <motion.div
             key={card.label}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -74,26 +83,27 @@ export function StatsPage() {
 
       <div className="bg-card border border-border rounded-3xl p-6 shadow-sm">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold">Vocabulary Growth</h2>
+          <h2 className="text-xl font-bold">Рост словарного запаса</h2>
           <div className="flex items-center gap-2 text-sm text-primary font-medium">
-            <Award size={16} /> Consistent
+            <Award size={16} /> Стабильно
           </div>
         </div>
-        
+
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorWords" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
               <YAxis axisLine={false} tickLine={false} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
-              <Tooltip 
+              <Tooltip
                 contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                 itemStyle={{ color: 'hsl(var(--primary))', fontWeight: 'bold' }}
+                formatter={(v: any) => [v, 'слов']}
               />
               <Area type="monotone" dataKey="words" stroke="hsl(var(--primary))" strokeWidth={3} fillOpacity={1} fill="url(#colorWords)" />
             </AreaChart>

@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "Love Texas"
+version = "1.0.0"
+id = "artifacts/love-texas"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22543
+
+[services.development]
+run = "pnpm --filter @workspace/love-texas run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/love-texas", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/love-texas/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22543"
+BASE_PATH = "/"

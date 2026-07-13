@@ -363,7 +363,7 @@ export function ReaderPage() {
   const fontCss = getFontCss(settings.fontFamily);
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col selection:bg-primary/20">
+    <div className="h-screen bg-background text-foreground flex flex-col selection:bg-primary/20 overflow-hidden">
       <header className="h-14 flex items-center justify-between px-4 border-b border-border/40 shrink-0 sticky top-0 bg-background/90 backdrop-blur-md z-20">
         <div className="flex items-center gap-2">
           <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors p-2 rounded-full hover:bg-muted">

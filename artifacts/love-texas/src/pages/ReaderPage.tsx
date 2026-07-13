@@ -434,7 +434,7 @@ export function ReaderPage() {
             <ChevronRight size={36} />
           </button>
 
-          <div className={`w-full ${widthClass} px-8 md:px-12 py-8 max-h-full overflow-y-auto`}>
+          <div className={`w-full ${widthClass} px-8 md:px-12 py-8 h-full overflow-hidden`}>
             <AnimatePresence>
               {showHint && (
                 <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}

@@ -26,7 +26,7 @@ function posRu(en: string): string {
 }
 
 // ── Cache ─────────────────────────────────────────────────────────────────────
-const CACHE_PREFIX = 'ltx3-word-';
+const CACHE_PREFIX = 'ltx4-word-';
 
 function readCache(key: string): WordInfo | null {
   try {
@@ -44,7 +44,7 @@ async function fromGoogleGtx(word: string): Promise<WordInfo | null> {
   try {
     const url =
       `https://translate.googleapis.com/translate_a/single` +
-      `?client=gtx&sl=en&tl=ru&dt=t&dt=bd&dt=rm&hl=ru` +
+      `?client=gtx&sl=en&tl=ru&dt=t&dt=bd` +
       `&q=${encodeURIComponent(word)}`;
     const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
     if (!res.ok) return null;

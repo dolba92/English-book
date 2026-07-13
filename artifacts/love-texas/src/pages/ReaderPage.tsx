@@ -4,7 +4,7 @@ import { Book, getBook, getProgress, saveProgress, addWordToDictionary } from '@
 import { paginateBook } from '@/lib/paginator';
 import { useReaderSettings } from '@/contexts/ReaderSettingsContext';
 import { getFontCss } from '@/lib/fonts';
-import { lookupWord, translateSentence, WordInfo } from '@/lib/wordlookup';
+import { lookupWord, translateSentence, WordInfo, RuGroup } from '@/lib/wordlookup';
 import {
   ArrowLeft, ChevronLeft, ChevronRight, Settings, X, Plus,
   Loader2, List, BookOpen, Languages, Microscope, Volume2
@@ -90,16 +90,6 @@ function splitSentences(text: string): string[] {
 interface PageData { title: string; paragraphs: string[]; isChapterStart: boolean; }
 interface TocEntry { title: string; pageIdx: number; }
 
-// ── POS label (English → Russian short) ──────────────────────────────────────
-const POS_LABELS: Record<string, string> = {
-  noun: 'сущ.', verb: 'гл.', adjective: 'прил.', adverb: 'нар.',
-  pronoun: 'мест.', preposition: 'пред.', conjunction: 'союз',
-  interjection: 'межд.', article: 'арт.', exclamation: 'межд.',
-};
-function posLabel(pos: string): string {
-  return POS_LABELS[pos.toLowerCase()] ?? pos;
-}
-
 // ── Word Tooltip ─────────────────────────────────────────────────────────────
 interface TooltipState {
   word: string;
@@ -114,112 +104,83 @@ function WordTooltip({
   state: TooltipState;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
-  onAdd: (word: string, translation: string, pos?: string) => void;
+  onAdd: (word: string, translation: string) => void;
 }) {
   const { word, x, y, info, loading } = state;
-  const primaryTranslation = info?.translation ?? '';
-  const alts = info?.translationAlt ?? [];
-  const hasMeanings = (info?.meanings?.length ?? 0) > 0;
+  const translation = info?.translation ?? '';
+  const groups: RuGroup[] = info?.groups ?? [];
+
+  // Clamp tooltip so it doesn't go off-screen left/right
+  const safeX = Math.max(148, Math.min(window.innerWidth - 148, x));
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8, scale: 0.95 }}
+      initial={{ opacity: 0, y: 6, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 8, scale: 0.95 }}
+      exit={{ opacity: 0, y: 6, scale: 0.96 }}
       transition={{ duration: 0.12 }}
       className="fixed z-50 pointer-events-auto"
-      style={{ left: x, top: y, transform: 'translate(-50%, -100%)', maxHeight: 'min(480px, 60vh)' }}
+      style={{ left: safeX, top: y, transform: 'translate(-50%, -100%)' }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
-      <div className="bg-card border border-border shadow-2xl rounded-2xl w-72 flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-start gap-2 p-4 pb-3 shrink-0">
+      <div className="bg-card border border-border shadow-2xl rounded-2xl w-60 overflow-hidden">
+        {/* Header: word + phonetic + speak */}
+        <div className="flex items-center gap-2 px-4 pt-4 pb-2">
           <div className="flex-1 min-w-0">
-            <h4 className="font-bold text-xl text-foreground leading-tight">{word}</h4>
+            <span className="font-bold text-lg text-foreground">{word}</span>
             {info?.phonetic && (
-              <span className="text-xs text-muted-foreground font-mono">{info.phonetic}</span>
+              <span className="ml-2 text-xs text-muted-foreground font-mono">{info.phonetic}</span>
             )}
           </div>
           <button
             onClick={e => { e.stopPropagation(); speak(word); }}
-            className="p-2 bg-muted text-muted-foreground hover:text-primary rounded-full transition-colors shrink-0 mt-0.5"
+            className="p-1.5 bg-muted text-muted-foreground hover:text-primary rounded-full transition-colors shrink-0"
           >
-            <Volume2 size={15} />
+            <Volume2 size={14} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3">
+        {/* Body */}
+        <div className="px-4 pb-3">
           {loading ? (
-            <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
-              <Loader2 size={13} className="animate-spin" />Ищем значения…
+            <div className="flex items-center gap-2 text-muted-foreground text-sm py-1">
+              <Loader2 size={13} className="animate-spin" />Ищем перевод…
             </div>
-          ) : (
+          ) : translation ? (
             <>
-              {/* Russian translation */}
-              {primaryTranslation ? (
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Перевод</p>
-                  <p className="text-base font-semibold text-foreground">{primaryTranslation}</p>
-                  {alts.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1.5">
-                      {alts.map((a, i) => (
-                        <span key={i} className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">{a}</span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground italic">Перевод недоступен</p>
-              )}
+              {/* Primary translation */}
+              <p className="text-base font-semibold text-foreground mb-2">{translation}</p>
 
-              {/* English definitions */}
-              {hasMeanings && (
-                <div className="space-y-2 border-t border-border/50 pt-2">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Значения (EN)</p>
-                  {info!.meanings.map((m, mi) => (
-                    <div key={mi}>
-                      <span className="text-[11px] font-semibold text-primary uppercase tracking-wide">{posLabel(m.partOfSpeech)}</span>
-                      <ul className="mt-0.5 space-y-1.5">
-                        {m.definitions.map((d, di) => (
-                          <li key={di} className="text-xs text-foreground/80 leading-relaxed">
-                            <span className="text-muted-foreground mr-1">{di + 1}.</span>
-                            {d.definition}
-                            {d.example && (
-                              <span className="block text-muted-foreground italic mt-0.5 pl-3 border-l border-border/50">"{d.example}"</span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                      {m.synonyms && m.synonyms.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1.5">
-                          {m.synonyms.map((s, si) => (
-                            <span key={si} className="text-[11px] bg-primary/5 text-primary/70 px-1.5 py-0.5 rounded">{s}</span>
-                          ))}
-                        </div>
-                      )}
+              {/* Grouped alternatives by POS */}
+              {groups.length > 0 && (
+                <div className="space-y-1.5 border-t border-border/40 pt-2">
+                  {groups.map((g, gi) => (
+                    <div key={gi} className="flex items-baseline gap-2 flex-wrap">
+                      <span className="text-[11px] font-bold text-primary/70 uppercase tracking-wide shrink-0">{g.pos}</span>
+                      <span className="text-xs text-foreground/80 leading-snug">
+                        {g.words.filter(w => w.toLowerCase() !== translation.toLowerCase()).join(', ')}
+                      </span>
                     </div>
                   ))}
                 </div>
               )}
             </>
+          ) : (
+            <p className="text-sm text-muted-foreground italic py-1">Перевод не найден</p>
           )}
         </div>
 
-        {/* Add to dictionary */}
-        {!loading && primaryTranslation && (
-          <div className="px-4 pb-4 shrink-0">
-            <button
-              onClick={() => {
-                const pos = info?.meanings?.[0]?.partOfSpeech;
-                onAdd(word, primaryTranslation, pos);
-              }}
-              className="w-full flex items-center justify-center gap-1.5 bg-primary/10 text-primary font-medium py-2.5 rounded-xl hover:bg-primary/20 transition-colors text-sm"
-            >
-              <Plus size={14} /> В словарь
-            </button>
-          </div>
-        )}
+        {/* Add to dictionary — always visible when we have something */}
+        <div className="px-3 pb-3">
+          <button
+            disabled={loading || !translation}
+            onClick={() => onAdd(word, translation)}
+            className="w-full flex items-center justify-center gap-1.5 bg-primary/10 text-primary font-medium py-2 rounded-xl hover:bg-primary/20 transition-colors text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Plus size={14} /> В словарь
+          </button>
+        </div>
       </div>
     </motion.div>
   );

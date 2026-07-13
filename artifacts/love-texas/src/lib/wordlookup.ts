@@ -1,154 +1,161 @@
 /**
- * Word lookup — Free Dictionary API (English definitions)
- * + MyMemory for Russian translation.
- * Results are cached in sessionStorage for the lifetime of the tab.
+ * Word lookup — Lingva Translate API (Google Translate proxy, CORS-friendly).
+ * Returns Russian translation + alternatives grouped by part of speech.
+ * Falls back to MyMemory if Lingva fails.
+ *
+ * Lingva API: https://lingva.ml/api/v1/{source}/{target}/{query}
  */
 
-export interface WordDefinition {
-  definition: string;
-  example?: string;
-}
-
-export interface WordMeaning {
-  partOfSpeech: string;
-  definitions: WordDefinition[];
-  synonyms?: string[];
+export interface RuGroup {
+  pos: string;          // часть речи на русском: «гл.», «сущ.», «прил.» и т.д.
+  words: string[];      // русские варианты перевода
 }
 
 export interface WordInfo {
   word: string;
   phonetic?: string;
-  meanings: WordMeaning[];       // English definitions, grouped by part of speech
-  translation?: string;          // Primary Russian translation
-  translationAlt?: string[];     // Alternative Russian translations
+  translation: string;  // основной перевод
+  groups: RuGroup[];    // все варианты, сгруппированные по частям речи
 }
 
-const DICT_BASE = 'https://api.dictionaryapi.dev/api/v2/entries/en';
-const MYMEMORY_BASE = 'https://api.mymemory.translated.net/get';
-const CACHE_PREFIX = 'ltx-word-';
+// ── Lingva mirrors (попробуем по очереди) ─────────────────────────────────────
+const LINGVA_MIRRORS = [
+  'https://lingva.ml',
+  'https://translate.plausibility.cloud',
+];
+
+// ── POS names EN → RU short ───────────────────────────────────────────────────
+const POS_RU: Record<string, string> = {
+  noun: 'сущ.', verb: 'гл.', adjective: 'прил.', adverb: 'нар.',
+  pronoun: 'мест.', preposition: 'пред.', conjunction: 'союз',
+  interjection: 'межд.', numeral: 'числ.', particle: 'части.',
+};
+function posRu(en: string): string {
+  return POS_RU[en.toLowerCase()] ?? en;
+}
+
+// ── Cache ─────────────────────────────────────────────────────────────────────
+const CACHE_PREFIX = 'ltx2-word-';
 
 function readCache(key: string): WordInfo | null {
   try {
     const raw = sessionStorage.getItem(CACHE_PREFIX + key);
     return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 function writeCache(key: string, val: WordInfo) {
+  try { sessionStorage.setItem(CACHE_PREFIX + key, JSON.stringify(val)); } catch {}
+}
+
+// ── Lingva lookup ─────────────────────────────────────────────────────────────
+async function fromLingva(word: string): Promise<WordInfo | null> {
+  for (const mirror of LINGVA_MIRRORS) {
+    try {
+      const url = `${mirror}/api/v1/en/ru/${encodeURIComponent(word)}`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) continue;
+      const json = await res.json();
+
+      const translation: string = json?.translation ?? '';
+      if (!translation) continue;
+
+      const phonetic: string | undefined =
+        json?.info?.pronunciation?.query || undefined;
+
+      const groups: RuGroup[] = [];
+      const rawGroups: any[] = json?.info?.translations ?? [];
+      for (const g of rawGroups) {
+        const pos = posRu(g.type ?? '');
+        const words: string[] = (g.list as any[])
+          .map((item: any) => (item.word as string).trim())
+          .filter(Boolean)
+          .slice(0, 5);
+        if (words.length) groups.push({ pos, words });
+      }
+
+      return { word, phonetic, translation, groups };
+    } catch { continue; }
+  }
+  return null;
+}
+
+// ── MyMemory fallback ─────────────────────────────────────────────────────────
+function isGarbage(s: string): boolean {
+  if (!s) return true;
+  if (/https?:\/\//.test(s)) return true;
+  if (/^[a-z]{2,}\.[a-z]{2,}/.test(s) && !/[а-яёА-ЯЁ]/.test(s)) return true;
+  if (s.length > 100) return true;
+  return false;
+}
+
+async function fromMyMemory(word: string): Promise<WordInfo | null> {
   try {
-    sessionStorage.setItem(CACHE_PREFIX + key, JSON.stringify(val));
-  } catch {}
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=en|ru`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(7000) });
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (json?.responseStatus !== 200) return null;
+
+    const raw: string = json?.responseData?.translatedText ?? '';
+    if (isGarbage(raw) || raw.toLowerCase().includes('mymemory warning')) return null;
+
+    // Collect alternatives from matches
+    const matches: any[] = json?.matches ?? [];
+    const alts: string[] = matches
+      .filter(m => (m.match ?? 0) >= 0.75 && !isGarbage(m.translation))
+      .map(m => (m.translation as string).trim())
+      .filter(t => t && t !== raw)
+      .slice(0, 4);
+
+    const groups: RuGroup[] = alts.length
+      ? [{ pos: 'др.', words: alts }]
+      : [];
+
+    return { word, translation: raw.trim(), groups };
+  } catch { return null; }
 }
 
-/** Clean up MyMemory response, which can include garbage like "bbs.import|" */
-function cleanMyMemoryResult(raw: string): { primary: string; alts: string[] } {
-  // Split on | and take non-garbage parts
-  const parts = raw
-    .split(/[|,;]/)
-    .map(p => p.trim())
-    .filter(p => {
-      if (!p) return false;
-      // Filter out garbage: urls, imports, very long parts, code-like strings
-      if (/https?:\/\//.test(p)) return false;
-      if (/\.\w+\|/.test(p)) return false;
-      if (/^[a-z]+\.[a-z]+/.test(p) && p.length > 20) return false; // likely code ref
-      if (p.length > 80) return false;
-      return true;
-    });
-
-  const [primary, ...alts] = parts;
-  return { primary: primary || '', alts: alts.slice(0, 3) };
-}
-
+// ── Public API ────────────────────────────────────────────────────────────────
 export async function lookupWord(word: string): Promise<WordInfo> {
   const key = word.toLowerCase().trim();
-  if (!key) return { word: key, meanings: [] };
+  const empty: WordInfo = { word: key, translation: '', groups: [] };
+  if (!key || key.length < 2) return empty;
 
   const cached = readCache(key);
   if (cached) return cached;
 
-  const result: WordInfo = { word: key, meanings: [] };
+  const result =
+    (await fromLingva(key)) ??
+    (await fromMyMemory(key)) ??
+    empty;
 
-  // 1 — Free Dictionary API (definitions, phonetics) — English only, no CORS issues
-  try {
-    const res = await fetch(`${DICT_BASE}/${encodeURIComponent(key)}`, {
-      signal: AbortSignal.timeout(5000),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const entry = data[0];
-      if (entry) {
-        // Phonetic
-        result.phonetic =
-          entry.phonetic ||
-          entry.phonetics?.find((p: any) => p.text)?.text ||
-          undefined;
-
-        // Meanings — take up to 3 parts of speech, 2 definitions each
-        result.meanings = (entry.meanings as any[])
-          .slice(0, 3)
-          .map((m: any) => ({
-            partOfSpeech: m.partOfSpeech,
-            definitions: (m.definitions as any[]).slice(0, 2).map((d: any) => ({
-              definition: d.definition,
-              example: d.example,
-            })),
-            synonyms: (m.synonyms as string[])?.slice(0, 4),
-          }));
-      }
-    }
-  } catch {
-    // Dictionary API failed — not critical
-  }
-
-  // 2 — MyMemory for Russian translation
-  try {
-    const url = `${MYMEMORY_BASE}?q=${encodeURIComponent(key)}&langpair=en|ru&de=anonymous`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
-    if (res.ok) {
-      const json = await res.json();
-      const raw: string = json?.responseData?.translatedText ?? '';
-      const status: number = json?.responseStatus ?? 0;
-
-      if (raw && status === 200 && !raw.toLowerCase().includes('mymemory warning')) {
-        const { primary, alts } = cleanMyMemoryResult(raw);
-        if (primary) {
-          result.translation = primary;
-          result.translationAlt = alts.filter(a => a !== primary);
-        }
-      }
-
-      // Also check matches array for alternatives
-      const matches: any[] = json?.matches ?? [];
-      const extraAlts = matches
-        .filter(m => m.segment?.toLowerCase() === key && m.translation && m['match'] >= 0.8)
-        .map(m => cleanMyMemoryResult(m.translation).primary)
-        .filter(Boolean)
-        .filter(t => t !== result.translation)
-        .slice(0, 3);
-
-      if (extraAlts.length) {
-        result.translationAlt = [...(result.translationAlt ?? []), ...extraAlts].slice(0, 4);
-      }
-    }
-  } catch {
-    // Translation failed
-  }
-
-  writeCache(key, result);
+  if (result.translation) writeCache(key, result);
   return result;
 }
 
-/** Translate a full sentence (for sentence panel) */
-export async function translateSentence(text: string, from = 'en', to = 'ru'): Promise<string> {
-  const url = `${MYMEMORY_BASE}?q=${encodeURIComponent(text)}&langpair=${from}|${to}`;
+/** Translate a full sentence to Russian */
+export async function translateSentence(text: string): Promise<string> {
+  // Try Lingva first (sentence translation)
+  for (const mirror of LINGVA_MIRRORS) {
+    try {
+      const url = `${mirror}/api/v1/en/ru/${encodeURIComponent(text)}`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      if (res.ok) {
+        const json = await res.json();
+        const t: string = json?.translation ?? '';
+        if (t) return t;
+      }
+    } catch { continue; }
+  }
+
+  // Fallback: MyMemory
+  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|ru`;
   const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
   if (!res.ok) throw new Error('translate failed');
   const json = await res.json();
   const raw: string = json?.responseData?.translatedText ?? '';
-  const status: number = json?.responseStatus ?? 0;
-  if (!raw || status !== 200 || raw.toLowerCase().includes('mymemory warning')) throw new Error('no result');
+  if (!raw || json?.responseStatus !== 200 || raw.toLowerCase().includes('mymemory warning'))
+    throw new Error('no result');
   return raw;
 }

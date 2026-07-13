@@ -110,6 +110,23 @@ function WordTooltip({
   const translation = info?.translation ?? '';
   const groups: RuGroup[] = info?.groups ?? [];
 
+  // Flatten all group words into a single list, deduplicated
+  const allVariants: string[] = [];
+  const seen = new Set<string>();
+  // Add main translation first
+  if (translation) {
+    seen.add(translation.toLowerCase());
+  }
+  for (const g of groups) {
+    for (const w of g.words) {
+      const low = w.toLowerCase();
+      if (!seen.has(low)) {
+        seen.add(low);
+        allVariants.push(w);
+      }
+    }
+  }
+
   // Clamp tooltip so it doesn't go off-screen left/right
   const safeX = Math.max(148, Math.min(window.innerWidth - 148, x));
 
@@ -124,15 +141,10 @@ function WordTooltip({
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
-      <div className="bg-card border border-border shadow-2xl rounded-2xl w-60 overflow-hidden">
-        {/* Header: word + phonetic + speak */}
-        <div className="flex items-center gap-2 px-4 pt-4 pb-2">
-          <div className="flex-1 min-w-0">
-            <span className="font-bold text-lg text-foreground">{word}</span>
-            {info?.phonetic && (
-              <span className="ml-2 text-xs text-muted-foreground font-mono">{info.phonetic}</span>
-            )}
-          </div>
+      <div className="bg-card border border-border shadow-2xl rounded-2xl w-72 overflow-hidden">
+        {/* Header: word + speak button */}
+        <div className="flex items-center gap-2 px-4 pt-4 pb-1">
+          <span className="flex-1 font-bold text-xl text-foreground leading-tight">{word}</span>
           <button
             onClick={e => { e.stopPropagation(); speak(word); }}
             className="p-1.5 bg-muted text-muted-foreground hover:text-primary rounded-full transition-colors shrink-0"
@@ -141,37 +153,35 @@ function WordTooltip({
           </button>
         </div>
 
+        {/* Phonetic */}
+        {info?.phonetic && (
+          <div className="px-4 pb-1">
+            <span className="text-xs text-muted-foreground font-mono">[{info.phonetic}]</span>
+          </div>
+        )}
+
         {/* Body */}
         <div className="px-4 pb-3">
           {loading ? (
-            <div className="flex items-center gap-2 text-muted-foreground text-sm py-1">
+            <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
               <Loader2 size={13} className="animate-spin" />Ищем перевод…
             </div>
           ) : translation ? (
-            <>
-              {/* Primary translation */}
-              <p className="text-base font-semibold text-foreground mb-2">{translation}</p>
-
-              {/* Grouped alternatives by POS */}
-              {groups.length > 0 && (
-                <div className="space-y-1.5 border-t border-border/40 pt-2">
-                  {groups.map((g, gi) => (
-                    <div key={gi} className="flex items-baseline gap-2 flex-wrap">
-                      <span className="text-[11px] font-bold text-primary/70 uppercase tracking-wide shrink-0">{g.pos}</span>
-                      <span className="text-xs text-foreground/80 leading-snug">
-                        {g.words.filter(w => w.toLowerCase() !== translation.toLowerCase()).join(', ')}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
+            <div className="mt-1">
+              {/* All translations as comma-separated line */}
+              <p className="text-sm text-foreground/85 leading-relaxed">
+                <span className="font-semibold text-foreground">{translation}</span>
+                {allVariants.length > 0 && (
+                  <span className="text-foreground/70">,&nbsp;{allVariants.join(',\u00A0')}</span>
+                )}
+              </p>
+            </div>
           ) : (
-            <p className="text-sm text-muted-foreground italic py-1">Перевод не найден</p>
+            <p className="text-sm text-muted-foreground italic py-2">Перевод не найден</p>
           )}
         </div>
 
-        {/* Add to dictionary — always visible when we have something */}
+        {/* Add to dictionary */}
         <div className="px-3 pb-3">
           <button
             disabled={loading || !translation}

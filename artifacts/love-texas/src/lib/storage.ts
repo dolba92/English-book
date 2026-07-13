@@ -142,6 +142,11 @@ export async function getProgress(bookId: number): Promise<BookProgress | undefi
   return db.get('progress', bookId);
 }
 
+export async function getAllProgress(): Promise<BookProgress[]> {
+  const db = await getDB();
+  return db.getAll('progress');
+}
+
 // --- DICTIONARY ---
 export async function addWordToDictionary(word: string, translation: string, transcription?: string, partOfSpeech?: string): Promise<number> {
   const db = await getDB();

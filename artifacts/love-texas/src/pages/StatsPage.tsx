@@ -1,22 +1,39 @@
 import React, { useEffect, useState } from 'react';
-import { getStats, AppStats, getAllBooks, getDictionaryWords } from '@/lib/storage';
+import { getStats, AppStats, getAllBooks, getDictionaryWords, getAllProgress, BookProgress } from '@/lib/storage';
 import { motion } from 'framer-motion';
-import { BookOpen, Brain, BookMarked, Award } from 'lucide-react';
+import { BookOpen, Brain, BookMarked, Award, FileText } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 export function StatsPage() {
   const [stats, setStats] = useState<AppStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [booksCount, setBooksCount] = useState(0);
+  const [booksFinished, setBooksFinished] = useState(0);
+  const [totalPagesTurned, setTotalPagesTurned] = useState(0);
   const [wordsCount, setWordsCount] = useState(0);
 
   useEffect(() => {
     const load = async () => {
       const s = await getStats();
-      const b = await getAllBooks();
+      const books = await getAllBooks();
+      const progressList: BookProgress[] = await getAllProgress();
       const w = await getDictionaryWords();
+
+      // Build a map bookId → progress for quick lookup
+      const progressMap = new Map<number, BookProgress>();
+      for (const p of progressList) progressMap.set(p.bookId, p);
+
+      // Books "read" = percentComplete >= 90
+      const finished = books.filter(b => {
+        const p = progressMap.get(b.id!);
+        return p && p.percentComplete >= 90;
+      }).length;
+
+      // Total pages turned = sum of currentPage across all progress records
+      const pages = progressList.reduce((sum, p) => sum + (p.currentPage ?? 0), 0);
+
       setStats(s);
-      setBooksCount(b.length);
+      setBooksFinished(finished);
+      setTotalPagesTurned(pages);
       setWordsCount(w.length);
       setLoading(false);
     };
@@ -29,7 +46,6 @@ export function StatsPage() {
 
   const daysActive = Math.max(1, Math.ceil((Date.now() - stats.firstUsed) / (1000 * 60 * 60 * 24)));
 
-  // Склонение "день / дня / дней"
   const dayWord = (n: number) => {
     const mod10 = n % 10;
     const mod100 = n % 100;
@@ -39,13 +55,12 @@ export function StatsPage() {
   };
 
   const cards = [
-    { label: 'Книг прочитано',   value: booksCount,               icon: BookOpen,   color: 'text-blue-500',   bg: 'bg-blue-100 dark:bg-blue-900/30' },
-    { label: 'Страниц перевёрнуто', value: stats.totalPagesRead,  icon: BookOpen,   color: 'text-indigo-500', bg: 'bg-indigo-100 dark:bg-indigo-900/30' },
-    { label: 'Слов в словаре',   value: wordsCount,               icon: BookMarked, color: 'text-pink-500',   bg: 'bg-pink-100 dark:bg-pink-900/30' },
-    { label: 'Тренировок',       value: stats.totalTrainingsDone, icon: Brain,      color: 'text-orange-500', bg: 'bg-orange-100 dark:bg-orange-900/30' },
+    { label: 'Книг прочитано',      value: booksFinished,              icon: BookOpen,   color: 'text-blue-500',   bg: 'bg-blue-100 dark:bg-blue-900/30' },
+    { label: 'Страниц перевёрнуто', value: totalPagesTurned,           icon: FileText,   color: 'text-indigo-500', bg: 'bg-indigo-100 dark:bg-indigo-900/30' },
+    { label: 'Слов в словаре',      value: wordsCount,                 icon: BookMarked, color: 'text-pink-500',   bg: 'bg-pink-100 dark:bg-pink-900/30' },
+    { label: 'Тренировок',          value: stats.totalTrainingsDone,   icon: Brain,      color: 'text-orange-500', bg: 'bg-orange-100 dark:bg-orange-900/30' },
   ];
 
-  // Mock chart data
   const chartData = [
     { name: 'Пн', words: Math.max(0, wordsCount - 15) },
     { name: 'Вт', words: Math.max(0, wordsCount - 10) },

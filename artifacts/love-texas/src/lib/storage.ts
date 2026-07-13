@@ -34,6 +34,12 @@ export interface DictionaryWord {
   partOfSpeech?: string;
   dateAdded: number; // timestamp
   errorCount: number;
+  // SRS (Spaced Repetition System) fields
+  nextReviewAt?: number;    // timestamp — когда показать снова
+  interval?: number;        // дней до следующего показа
+  easeFactor?: number;      // коэффициент лёгкости (SM-2)
+  reviewCount?: number;     // сколько раз повторено
+  successStreak?: number;   // подряд правильных ответов (>= 3 → "знаю")
 }
 
 export interface AppStats {
@@ -179,6 +185,18 @@ export async function updateWordErrorCount(id: number, increment: number): Promi
   const word = await db.get('dictionary', id);
   if (word) {
     word.errorCount = Math.max(0, word.errorCount + increment);
+    await db.put('dictionary', word);
+  }
+}
+
+export async function updateWordSRS(
+  id: number,
+  patch: Partial<Pick<DictionaryWord, 'nextReviewAt' | 'interval' | 'easeFactor' | 'reviewCount' | 'errorCount' | 'successStreak'>>
+): Promise<void> {
+  const db = await getDB();
+  const word = await db.get('dictionary', id);
+  if (word) {
+    Object.assign(word, patch);
     await db.put('dictionary', word);
   }
 }

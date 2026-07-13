@@ -3,18 +3,26 @@ import { useReaderSettings } from '@/contexts/ReaderSettingsContext';
 import { applyTheme, getTheme, Theme } from '@/lib/theme';
 import { clearAllData, clearDictionary } from '@/lib/storage';
 import { FONTS } from '@/lib/fonts';
+import { getSRSSettings, saveSRSSettings, SRSSettings } from '@/lib/srs';
 import { motion } from 'framer-motion';
-import { Trash2, CheckCircle2 } from 'lucide-react';
+import { Trash2, CheckCircle2, BrainCircuit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export function SettingsPage() {
   const { settings, updateSettings } = useReaderSettings();
   const [currentTheme, setCurrentTheme] = useState<Theme>(getTheme());
+  const [srs, setSrsLocal] = useState<SRSSettings>(getSRSSettings());
   const { toast } = useToast();
 
   const handleThemeChange = (theme: Theme) => {
     applyTheme(theme);
     setCurrentTheme(theme);
+  };
+
+  const updateSRS = (patch: Partial<SRSSettings>) => {
+    const next = { ...srs, ...patch };
+    setSrsLocal(next);
+    saveSRSSettings(next);
   };
 
   const handleClearDict = async () => {
@@ -46,11 +54,8 @@ export function SettingsPage() {
               { id: 'pink',   name: 'Love Texas', bg: 'bg-[#fff5f6]',  border: 'border-pink-200',   text: 'text-pink-950' },
               { id: 'cream',  name: 'Кремовая',   bg: 'bg-[#f4ebd8]',  border: 'border-[#e6d5b8]',  text: 'text-[#4a3f35]' },
             ].map(t => (
-              <div
-                key={t.id}
-                onClick={() => handleThemeChange(t.id as Theme)}
-                className={`relative cursor-pointer rounded-2xl p-4 border-2 transition-all ${t.bg} ${t.border} ${currentTheme === t.id ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : 'hover:scale-[1.02]'}`}
-              >
+              <div key={t.id} onClick={() => handleThemeChange(t.id as Theme)}
+                className={`relative cursor-pointer rounded-2xl p-4 border-2 transition-all ${t.bg} ${t.border} ${currentTheme === t.id ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : 'hover:scale-[1.02]'}`}>
                 <div className="flex justify-between items-center mb-4">
                   <span className={`font-bold ${t.text}`}>{t.name}</span>
                   {currentTheme === t.id && <CheckCircle2 className={t.text} size={20} />}
@@ -64,70 +69,46 @@ export function SettingsPage() {
           </div>
         </section>
 
-        {/* Настройки чтения */}
+        {/* Параметры чтения */}
         <section className="bg-card border border-border rounded-3xl p-6 shadow-sm">
           <h2 className="text-xl font-bold mb-6">Параметры чтения</h2>
-
           <div className="space-y-6">
-            {/* Размер шрифта */}
             <div>
               <label className="flex justify-between text-sm font-medium mb-3">
                 <span>Размер шрифта</span>
                 <span className="text-muted-foreground">{settings.fontSize} пт</span>
               </label>
-              <input
-                type="range" min="12" max="28" step="1"
-                value={settings.fontSize}
+              <input type="range" min="12" max="28" step="1" value={settings.fontSize}
                 onChange={e => updateSettings({ fontSize: parseInt(e.target.value) })}
-                className="w-full accent-primary h-2 bg-muted rounded-lg appearance-none cursor-pointer"
-              />
+                className="w-full accent-primary h-2 bg-muted rounded-lg appearance-none cursor-pointer" />
             </div>
-
-            {/* Межстрочный интервал */}
             <div>
               <label className="flex justify-between text-sm font-medium mb-3">
                 <span>Межстрочный интервал</span>
                 <span className="text-muted-foreground">{settings.lineHeight}×</span>
               </label>
-              <input
-                type="range" min="1.4" max="2.4" step="0.1"
-                value={settings.lineHeight}
+              <input type="range" min="1.4" max="2.4" step="0.1" value={settings.lineHeight}
                 onChange={e => updateSettings({ lineHeight: parseFloat(e.target.value) })}
-                className="w-full accent-primary h-2 bg-muted rounded-lg appearance-none cursor-pointer"
-              />
+                className="w-full accent-primary h-2 bg-muted rounded-lg appearance-none cursor-pointer" />
             </div>
-
-            {/* Ширина страницы */}
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium">Ширина страницы</label>
               <div className="flex bg-muted p-1 rounded-xl">
-                {[
-                  { value: 'narrow', label: 'Узкая' },
-                  { value: 'medium', label: 'Средняя' },
-                  { value: 'wide',   label: 'Широкая' },
-                ].map(w => (
-                  <button
-                    key={w.value}
-                    onClick={() => updateSettings({ pageWidth: w.value as any })}
-                    className={`px-4 py-1.5 rounded-lg text-sm transition-colors ${settings.pageWidth === w.value ? 'bg-card text-foreground shadow-sm font-medium' : 'text-muted-foreground hover:text-foreground'}`}
-                  >
+                {[{ value: 'narrow', label: 'Узкая' }, { value: 'medium', label: 'Средняя' }, { value: 'wide', label: 'Широкая' }].map(w => (
+                  <button key={w.value} onClick={() => updateSettings({ pageWidth: w.value as any })}
+                    className={`px-4 py-1.5 rounded-lg text-sm transition-colors ${settings.pageWidth === w.value ? 'bg-card text-foreground shadow-sm font-medium' : 'text-muted-foreground hover:text-foreground'}`}>
                     {w.label}
                   </button>
                 ))}
               </div>
             </div>
-
-            {/* Шрифт */}
             <div>
               <label className="text-sm font-medium block mb-3">Шрифт</label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {FONTS.map(f => (
-                  <button
-                    key={f.value}
-                    onClick={() => updateSettings({ fontFamily: f.value })}
+                  <button key={f.value} onClick={() => updateSettings({ fontFamily: f.value })}
                     className={`px-3 py-2.5 rounded-xl text-sm border-2 transition-all text-left ${settings.fontFamily === f.value ? 'border-primary bg-primary/5 font-semibold' : 'border-border bg-muted/30 hover:border-primary/40'}`}
-                    style={{ fontFamily: f.css }}
-                  >
+                    style={{ fontFamily: f.css }}>
                     {f.label}
                   </button>
                 ))}
@@ -136,24 +117,93 @@ export function SettingsPage() {
           </div>
         </section>
 
+        {/* Интервальное повторение */}
+        <section className="bg-card border border-border rounded-3xl p-6 shadow-sm">
+          <h2 className="text-xl font-bold mb-2 flex items-center gap-2">
+            <BrainCircuit size={20} className="text-primary" />
+            Интервальное повторение
+          </h2>
+          <p className="text-sm text-muted-foreground mb-6">
+            Настройте, как часто слова будут появляться на повторение. Алгоритм SM-2.
+          </p>
+          <div className="space-y-6">
+            {/* Множитель лёгкости */}
+            <div>
+              <label className="flex justify-between text-sm font-medium mb-1">
+                <span>Множитель при правильном ответе</span>
+                <span className="text-muted-foreground font-bold text-primary">×{srs.easyMultiplier.toFixed(1)}</span>
+              </label>
+              <p className="text-xs text-muted-foreground mb-3">
+                Во сколько раз растёт интервал после верного ответа. Чем больше — тем реже повторения.
+              </p>
+              <input type="range" min="1.5" max="3.0" step="0.1" value={srs.easyMultiplier}
+                onChange={e => updateSRS({ easyMultiplier: parseFloat(e.target.value) })}
+                className="w-full accent-primary h-2 bg-muted rounded-lg appearance-none cursor-pointer" />
+              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                <span>×1.5 (чаще)</span>
+                <span>×3.0 (реже)</span>
+              </div>
+            </div>
+
+            {/* Штраф за ошибку */}
+            <div>
+              <label className="flex justify-between text-sm font-medium mb-1">
+                <span>Интервал после ошибки</span>
+                <span className="text-muted-foreground font-bold text-destructive">{srs.hardPenaltyDays} {srs.hardPenaltyDays === 1 ? 'день' : srs.hardPenaltyDays <= 4 ? 'дня' : 'дней'}</span>
+              </label>
+              <p className="text-xs text-muted-foreground mb-3">
+                Через сколько дней показать слово снова после ошибки.
+              </p>
+              <input type="range" min="1" max="5" step="1" value={srs.hardPenaltyDays}
+                onChange={e => updateSRS({ hardPenaltyDays: parseInt(e.target.value) })}
+                className="w-full accent-primary h-2 bg-muted rounded-lg appearance-none cursor-pointer" />
+              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                <span>1 день (строже)</span>
+                <span>5 дней (мягче)</span>
+              </div>
+            </div>
+
+            {/* Максимальный интервал */}
+            <div>
+              <label className="flex justify-between text-sm font-medium mb-1">
+                <span>Максимальный интервал</span>
+                <span className="text-muted-foreground font-bold">{srs.maxIntervalDays} дней</span>
+              </label>
+              <p className="text-xs text-muted-foreground mb-3">
+                Слова не пропадут дольше этого срока даже при хорошем знании.
+              </p>
+              <input type="range" min="30" max="365" step="10" value={srs.maxIntervalDays}
+                onChange={e => updateSRS({ maxIntervalDays: parseInt(e.target.value) })}
+                className="w-full accent-primary h-2 bg-muted rounded-lg appearance-none cursor-pointer" />
+              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                <span>30 дней</span>
+                <span>365 дней</span>
+              </div>
+            </div>
+
+            {/* Сброс SRS */}
+            <button
+              onClick={() => { const def = { easyMultiplier: 2.5, hardPenaltyDays: 1, maxIntervalDays: 90 }; setSrsLocal(def); saveSRSSettings(def); toast({ title: 'Настройки повторения сброшены' }); }}
+              className="text-sm text-muted-foreground hover:text-foreground border border-border rounded-xl px-4 py-2 transition-colors hover:bg-muted"
+            >
+              Сбросить к стандартным
+            </button>
+          </div>
+        </section>
+
         {/* Управление данными */}
         <section className="bg-destructive/5 border border-destructive/20 rounded-3xl p-6">
           <h2 className="text-xl font-bold mb-4 text-destructive flex items-center gap-2">
-            <Trash2 size={20} />
-            Управление данными
+            <Trash2 size={20} /> Управление данными
           </h2>
           <p className="text-sm text-muted-foreground mb-6">Данные хранятся только на этом устройстве. Действия необратимы.</p>
           <div className="flex flex-col gap-3">
-            <button
-              onClick={handleClearDict}
-              className="bg-card border border-destructive/30 text-destructive hover:bg-destructive hover:text-destructive-foreground px-4 py-3 rounded-xl font-medium transition-colors text-left"
-            >
+            <button onClick={handleClearDict}
+              className="bg-card border border-destructive/30 text-destructive hover:bg-destructive hover:text-destructive-foreground px-4 py-3 rounded-xl font-medium transition-colors text-left">
               Очистить словарь
             </button>
-            <button
-              onClick={handleClearAll}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 px-4 py-3 rounded-xl font-medium transition-colors text-left"
-            >
+            <button onClick={handleClearAll}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 px-4 py-3 rounded-xl font-medium transition-colors text-left">
               Удалить все данные
             </button>
           </div>

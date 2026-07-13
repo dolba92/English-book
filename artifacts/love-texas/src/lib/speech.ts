@@ -1,59 +1,37 @@
-let voicesReady = false;
-let cachedVoice: SpeechSynthesisVoice | null = null;
-
-function pickEnglishVoice(): SpeechSynthesisVoice | null {
-  if (!('speechSynthesis' in window)) return null;
-  const voices = window.speechSynthesis.getVoices();
-  if (voices.length === 0) return null;
-
-  // Prefer a named US English voice
-  return (
-    voices.find(v => v.lang === 'en-US' && (v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Alex'))) ||
-    voices.find(v => v.lang === 'en-US') ||
-    voices.find(v => v.lang.startsWith('en')) ||
-    null
-  );
-}
-
-// Pre-load voices as soon as possible
-if ('speechSynthesis' in window) {
-  // Chrome loads voices async
-  if (window.speechSynthesis.getVoices().length > 0) {
-    cachedVoice = pickEnglishVoice();
-    voicesReady = true;
-  }
-  window.speechSynthesis.onvoiceschanged = () => {
-    cachedVoice = pickEnglishVoice();
-    voicesReady = true;
-  };
-}
-
+/**
+ * speak() — произнести английское слово/фразу через Web Speech API.
+ * Максимально простая реализация без лишних зависимостей.
+ */
 export function speak(text: string): void {
   if (!('speechSynthesis' in window) || !text.trim()) return;
 
-  // Cancel any ongoing speech first
+  // Отменяем текущее воспроизведение
   window.speechSynthesis.cancel();
 
-  const utterance = new SpeechSynthesisUtterance(text.trim());
-  utterance.lang = 'en-US';
-  utterance.rate = 0.9;
+  const say = () => {
+    const u = new SpeechSynthesisUtterance(text.trim());
+    u.lang = 'en-US';
+    u.rate = 0.85;
+    u.pitch = 1;
 
-  // Use cached voice if available, otherwise let browser pick
-  if (voicesReady && cachedVoice) {
-    utterance.voice = cachedVoice;
-  } else if (!voicesReady) {
-    // Voices not loaded yet — retry after a short delay
-    setTimeout(() => {
-      cachedVoice = pickEnglishVoice();
-      voicesReady = true;
-      const u2 = new SpeechSynthesisUtterance(text.trim());
-      u2.lang = 'en-US';
-      u2.rate = 0.9;
-      if (cachedVoice) u2.voice = cachedVoice;
-      window.speechSynthesis.speak(u2);
-    }, 300);
-    return;
+    // Пробуем выбрать английский голос
+    const voices = window.speechSynthesis.getVoices();
+    const en = voices.find(v => v.lang === 'en-US') || voices.find(v => v.lang.startsWith('en'));
+    if (en) u.voice = en;
+
+    window.speechSynthesis.speak(u);
+  };
+
+  // Если голоса ещё не загружены — ждём события
+  if (window.speechSynthesis.getVoices().length === 0) {
+    const handler = () => {
+      window.speechSynthesis.removeEventListener('voiceschanged', handler);
+      say();
+    };
+    window.speechSynthesis.addEventListener('voiceschanged', handler);
+    // Страховочный таймаут: если событие не придёт — всё равно говорим
+    setTimeout(say, 500);
+  } else {
+    say();
   }
-
-  window.speechSynthesis.speak(utterance);
 }

@@ -81,7 +81,7 @@ export function LibraryPage() {
       } else if (file.name.endsWith('.fb2')) {
         parsed = await parseFb2(file);
       } else {
-        alert("Only EPUB and FB2 files are supported.");
+        alert("Поддерживаются только файлы EPUB и FB2.");
         return;
       }
 
@@ -103,7 +103,7 @@ export function LibraryPage() {
       await loadBooks();
     } catch (err) {
       console.error(err);
-      alert("Failed to parse book. The file may be corrupted or unsupported.");
+      alert("Не удалось открыть книгу. Файл может быть повреждён или не поддерживается.");
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -124,14 +124,13 @@ export function LibraryPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
-          <h1 className="text-3xl font-serif font-bold text-foreground">Your Library</h1>
-          <p className="text-muted-foreground mt-1">Cozy corner for your English journey</p>
+          <h1 className="text-3xl font-serif font-bold text-foreground">Библиотека</h1>
+          <p className="text-muted-foreground mt-1">Уютный уголок для изучения английского</p>
         </div>
 
-        {/* Add Book button */}
         <div className="flex items-center gap-3">
           {uploading && (
-            <span className="text-sm text-primary animate-pulse font-medium">Adding to shelf…</span>
+            <span className="text-sm text-primary animate-pulse font-medium">Добавляем книгу…</span>
           )}
           <button
             onClick={() => fileInputRef.current?.click()}
@@ -139,7 +138,7 @@ export function LibraryPage() {
             className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-full font-medium hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-60"
           >
             <Plus size={18} />
-            Add Book
+            Добавить книгу
           </button>
           <input
             ref={fileInputRef}
@@ -151,16 +150,16 @@ export function LibraryPage() {
         </div>
       </div>
 
-      {/* Books grid */}
+      {/* Books grid — wider cards: fewer columns */}
       {loading ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="rounded-2xl bg-muted animate-pulse" style={{ paddingBottom: '160%' }} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="rounded-2xl bg-muted animate-pulse" style={{ paddingBottom: '140%' }} />
           ))}
         </div>
       ) : books.length > 0 ? (
         <AnimatePresence>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
             {books.map((item, idx) => (
               <motion.div
                 key={item.book.id}
@@ -183,16 +182,16 @@ export function LibraryPage() {
           <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center text-muted-foreground mb-4">
             <BookIcon size={40} />
           </div>
-          <h2 className="text-xl font-medium text-foreground mb-2">Your shelf is empty</h2>
+          <h2 className="text-xl font-medium text-foreground mb-2">Полка пустая</h2>
           <p className="text-muted-foreground max-w-sm mb-6">
-            Upload an EPUB or FB2 book to start reading and collecting new words.
+            Загрузите книгу в формате EPUB или FB2, чтобы начать читать и собирать новые слова.
           </p>
           <button
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-full font-medium hover:bg-primary/90 transition-colors shadow"
           >
             <Plus size={18} />
-            Add your first book
+            Добавить первую книгу
           </button>
         </div>
       )}

@@ -4,23 +4,14 @@ import { Book, getBook, getProgress, saveProgress, addWordToDictionary } from '@
 import { paginateBook } from '@/lib/paginator';
 import { useReaderSettings } from '@/contexts/ReaderSettingsContext';
 import { getFontCss } from '@/lib/fonts';
+import { lookupWord, translateSentence, WordInfo } from '@/lib/wordlookup';
 import {
   ArrowLeft, ChevronLeft, ChevronRight, Settings, X, Plus,
-  Loader2, List, BookOpen, Languages, Microscope
+  Loader2, List, BookOpen, Languages, Microscope, Volume2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { lookupWord } from '@/lib/dictionary';
 import { speak } from '@/lib/speech';
 import { useToast } from '@/hooks/use-toast';
-
-// ── Google Translate ─────────────────────────────────────────────────────────
-async function googleTranslate(text: string, target = 'ru'): Promise<string> {
-  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${target}&dt=t&q=${encodeURIComponent(text)}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('translate failed');
-  const json = await res.json();
-  return (json[0] as any[]).map((c: any) => c[0]).join('');
-}
 
 // ── Grammar Analyser ─────────────────────────────────────────────────────────
 interface GrammarInfo {
@@ -36,50 +27,27 @@ function analyzeGrammar(sentence: string): GrammarInfo {
   const raw = s.replace(/[.,!?;:"'()[\]{}—…«»]/g, ' ');
   const words = raw.split(/\s+/).filter(Boolean);
 
-  // Тип предложения
   const sentenceType = s.endsWith('?') ? 'Вопросительное' : s.endsWith('!') ? 'Восклицательное' : 'Утвердительное';
-
-  // Модальные глаголы
   const modalList = ['can', 'could', 'will', 'would', 'shall', 'should', 'may', 'might', 'must', 'need', 'ought'];
   const modals = modalList.filter(m => words.includes(m));
-
-  // Be-глаголы
   const beVerbs = ['am', 'is', 'are', 'was', 'were', 'been', 'being', 'be'];
   const hasBeVerb = beVerbs.some(v => words.includes(v));
   const ingForm = /\b\w+ing\b/.test(raw);
   const edForm = /\b\w+ed\b/.test(raw);
-  const irregulars = ['written','spoken','taken','given','known','shown','seen','done','gone','come','run','brought','thought','bought','caught','taught','built','made','said','told','found','heard','left','led','lost','met','read','sent','set','cut','put','let','hit','bid','spread','shed'];
+  const irregulars = ['written','spoken','taken','given','known','shown','seen','done','gone','come','run','brought','thought','bought','caught','taught','built','made','said','told','found','heard','left','led','lost','met','read','sent','set','cut','put','let','hit'];
   const hasPP = edForm || irregulars.some(v => words.includes(v));
-
-  // Залог
   const isPassive = hasBeVerb && hasPP && !ingForm;
   const voice = isPassive ? 'Страдательный залог (Passive Voice)' : 'Действительный залог (Active Voice)';
-
-  // Время
-  let tense = 'Present Simple';
   const has = (w: string) => words.includes(w);
-
-  if (has('will') || has('shall')) {
-    tense = ingForm ? 'Future Continuous' : has('have') || has('has') ? 'Future Perfect' : 'Future Simple';
-  } else if ((has('is') || has('am') || has('are')) && ingForm && !isPassive) {
-    tense = 'Present Continuous';
-  } else if ((has('was') || has('were')) && ingForm && !isPassive) {
-    tense = 'Past Continuous';
-  } else if (has('had') && hasPP) {
-    tense = 'Past Perfect';
-  } else if ((has('have') || has('has')) && hasPP) {
-    tense = ingForm ? 'Present Perfect Continuous' : 'Present Perfect';
-  } else if ((has('was') || has('were')) && isPassive) {
-    tense = 'Past Simple (Passive)';
-  } else if (has('was') || has('were')) {
-    tense = 'Past Simple (to be)';
-  } else if (edForm || has('did') || has("didn't") || has('didn\'t')) {
-    tense = 'Past Simple';
-  } else {
-    tense = 'Present Simple';
-  }
-
-  // Конструкции
+  let tense = 'Present Simple';
+  if (has('will') || has('shall')) { tense = ingForm ? 'Future Continuous' : 'Future Simple'; }
+  else if ((has('is') || has('am') || has('are')) && ingForm && !isPassive) { tense = 'Present Continuous'; }
+  else if ((has('was') || has('were')) && ingForm && !isPassive) { tense = 'Past Continuous'; }
+  else if (has('had') && hasPP) { tense = 'Past Perfect'; }
+  else if ((has('have') || has('has')) && hasPP) { tense = ingForm ? 'Present Perfect Continuous' : 'Present Perfect'; }
+  else if ((has('was') || has('were')) && isPassive) { tense = 'Past Simple (Passive)'; }
+  else if (has('was') || has('were')) { tense = 'Past Simple (to be)'; }
+  else if (edForm || has('did')) { tense = 'Past Simple'; }
   const constructions: string[] = [];
   if (/\bthere (is|are|was|were)\b/.test(s)) constructions.push('there is/are — оборот существования');
   if (/\bit (is|was|seems|appears)\b/.test(s)) constructions.push('it is — безличный оборот');
@@ -89,22 +57,17 @@ function analyzeGrammar(sentence: string): GrammarInfo {
   if (/\b(which|who|whom|whose|that)\b/.test(s)) constructions.push('Определительное придаточное (Relative clause)');
   if (/\bnot\b|n't\b/.test(s)) constructions.push('Отрицание (Negation)');
   if (modals.length > 0) constructions.push(`Модальный глагол: ${modals.join(', ')}`);
-  if (/\beither\b|\bneither\b/.test(s)) constructions.push('either/neither — двойное отрицание/выбор');
-  if (/\bboth\b/.test(s)) constructions.push('both — оба, двойное утверждение');
-
-  // Подсказка для изучения
   const tips: Record<string, string> = {
-    'Present Simple': 'Регулярные действия, факты. Образование: S + V(s) + O.',
-    'Present Continuous': 'Действие происходит прямо сейчас. Образование: am/is/are + Ving.',
-    'Present Perfect': 'Действие завершено, результат важен сейчас. Образование: have/has + V3.',
+    'Present Simple': 'Регулярные действия, факты. Образование: S + V(s).',
+    'Present Continuous': 'Действие прямо сейчас. Образование: am/is/are + Ving.',
+    'Present Perfect': 'Завершено, результат важен сейчас. Образование: have/has + V3.',
     'Past Simple': 'Завершённое действие в прошлом. Образование: V2 (или did + V).',
-    'Past Continuous': 'Действие происходило в определённый момент прошлого. Образование: was/were + Ving.',
-    'Past Perfect': 'Действие произошло раньше другого прошедшего. Образование: had + V3.',
-    'Future Simple': 'Предсказание или спонтанное решение о будущем. Образование: will + V.',
+    'Past Continuous': 'В определённый момент прошлого. Образование: was/were + Ving.',
+    'Past Perfect': 'Раньше другого прошедшего. Образование: had + V3.',
+    'Future Simple': 'Предсказание или спонтанное решение. Образование: will + V.',
+    'Future Continuous': 'Будет происходить в определённый момент. Образование: will be + Ving.',
   };
-  const tip = tips[tense] || '';
-
-  return { sentenceType, tense, voice, constructions, tip };
+  return { sentenceType, tense, voice, constructions, tip: tips[tense] || '' };
 }
 
 // ── Sentence splitter ────────────────────────────────────────────────────────
@@ -124,15 +87,142 @@ function splitSentences(text: string): string[] {
   return results.length > 0 ? results : [text];
 }
 
-// ── Types ────────────────────────────────────────────────────────────────────
-interface PageData {
-  title: string;
-  paragraphs: string[];
-  isChapterStart: boolean;
+interface PageData { title: string; paragraphs: string[]; isChapterStart: boolean; }
+interface TocEntry { title: string; pageIdx: number; }
+
+// ── POS label (English → Russian short) ──────────────────────────────────────
+const POS_LABELS: Record<string, string> = {
+  noun: 'сущ.', verb: 'гл.', adjective: 'прил.', adverb: 'нар.',
+  pronoun: 'мест.', preposition: 'пред.', conjunction: 'союз',
+  interjection: 'межд.', article: 'арт.', exclamation: 'межд.',
+};
+function posLabel(pos: string): string {
+  return POS_LABELS[pos.toLowerCase()] ?? pos;
 }
-interface TocEntry {
-  title: string;
-  pageIdx: number;
+
+// ── Word Tooltip ─────────────────────────────────────────────────────────────
+interface TooltipState {
+  word: string;
+  x: number; y: number;
+  info: WordInfo | null;
+  loading: boolean;
+}
+
+function WordTooltip({
+  state, onMouseEnter, onMouseLeave, onAdd,
+}: {
+  state: TooltipState;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+  onAdd: (word: string, translation: string, pos?: string) => void;
+}) {
+  const { word, x, y, info, loading } = state;
+  const primaryTranslation = info?.translation ?? '';
+  const alts = info?.translationAlt ?? [];
+  const hasMeanings = (info?.meanings?.length ?? 0) > 0;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 8, scale: 0.95 }}
+      transition={{ duration: 0.12 }}
+      className="fixed z-50 pointer-events-auto"
+      style={{ left: x, top: y, transform: 'translate(-50%, -100%)', maxHeight: 'min(480px, 60vh)' }}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
+      <div className="bg-card border border-border shadow-2xl rounded-2xl w-72 flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="flex items-start gap-2 p-4 pb-3 shrink-0">
+          <div className="flex-1 min-w-0">
+            <h4 className="font-bold text-xl text-foreground leading-tight">{word}</h4>
+            {info?.phonetic && (
+              <span className="text-xs text-muted-foreground font-mono">{info.phonetic}</span>
+            )}
+          </div>
+          <button
+            onClick={e => { e.stopPropagation(); speak(word); }}
+            className="p-2 bg-muted text-muted-foreground hover:text-primary rounded-full transition-colors shrink-0 mt-0.5"
+          >
+            <Volume2 size={15} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3">
+          {loading ? (
+            <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
+              <Loader2 size={13} className="animate-spin" />Ищем значения…
+            </div>
+          ) : (
+            <>
+              {/* Russian translation */}
+              {primaryTranslation ? (
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Перевод</p>
+                  <p className="text-base font-semibold text-foreground">{primaryTranslation}</p>
+                  {alts.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {alts.map((a, i) => (
+                        <span key={i} className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">{a}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground italic">Перевод недоступен</p>
+              )}
+
+              {/* English definitions */}
+              {hasMeanings && (
+                <div className="space-y-2 border-t border-border/50 pt-2">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Значения (EN)</p>
+                  {info!.meanings.map((m, mi) => (
+                    <div key={mi}>
+                      <span className="text-[11px] font-semibold text-primary uppercase tracking-wide">{posLabel(m.partOfSpeech)}</span>
+                      <ul className="mt-0.5 space-y-1.5">
+                        {m.definitions.map((d, di) => (
+                          <li key={di} className="text-xs text-foreground/80 leading-relaxed">
+                            <span className="text-muted-foreground mr-1">{di + 1}.</span>
+                            {d.definition}
+                            {d.example && (
+                              <span className="block text-muted-foreground italic mt-0.5 pl-3 border-l border-border/50">"{d.example}"</span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                      {m.synonyms && m.synonyms.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {m.synonyms.map((s, si) => (
+                            <span key={si} className="text-[11px] bg-primary/5 text-primary/70 px-1.5 py-0.5 rounded">{s}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Add to dictionary */}
+        {!loading && primaryTranslation && (
+          <div className="px-4 pb-4 shrink-0">
+            <button
+              onClick={() => {
+                const pos = info?.meanings?.[0]?.partOfSpeech;
+                onAdd(word, primaryTranslation, pos);
+              }}
+              className="w-full flex items-center justify-center gap-1.5 bg-primary/10 text-primary font-medium py-2.5 rounded-xl hover:bg-primary/20 transition-colors text-sm"
+            >
+              <Plus size={14} /> В словарь
+            </button>
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -147,27 +237,18 @@ export function ReaderPage() {
   const [currentPageIdx, setCurrentPageIdx] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // Word tooltip
-  const [hoveredWord, setHoveredWord] = useState<{
-    word: string; x: number; y: number;
-    translation: string | null; pos: string; translating: boolean;
-  } | null>(null);
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
-  // Sentence panel (translation + grammar)
   const [selectedSentence, setSelectedSentence] = useState<string | null>(null);
   const [sentenceTranslation, setSentenceTranslation] = useState<string | null>(null);
   const [sentenceGrammar, setSentenceGrammar] = useState<GrammarInfo | null>(null);
   const [translating, setTranslating] = useState(false);
   const [panelTab, setPanelTab] = useState<'translate' | 'grammar'>('translate');
 
-  // TOC panel
   const [showToc, setShowToc] = useState(false);
-
-  // Hint visibility (shown once per session)
   const [showHint, setShowHint] = useState(() => !localStorage.getItem('reader-hint-dismissed'));
-
-  // Page jump
   const [jumpValue, setJumpValue] = useState('');
   const [editingPage, setEditingPage] = useState(false);
 
@@ -216,18 +297,16 @@ export function ReaderPage() {
     return active;
   }, [tocEntries, currentPageIdx]);
 
+  const closeSentencePanel = () => {
+    setSelectedSentence(null); setSentenceTranslation(null); setSentenceGrammar(null);
+  };
+
   const handleNext = useCallback(() => {
-    if (currentPageIdx < pages.length - 1) {
-      setCurrentPageIdx(p => p + 1);
-      setSelectedSentence(null); setSentenceTranslation(null); setSentenceGrammar(null);
-    }
+    if (currentPageIdx < pages.length - 1) { setCurrentPageIdx(p => p + 1); closeSentencePanel(); }
   }, [currentPageIdx, pages.length]);
 
   const handlePrev = useCallback(() => {
-    if (currentPageIdx > 0) {
-      setCurrentPageIdx(p => p - 1);
-      setSelectedSentence(null); setSentenceTranslation(null); setSentenceGrammar(null);
-    }
+    if (currentPageIdx > 0) { setCurrentPageIdx(p => p - 1); closeSentencePanel(); }
   }, [currentPageIdx]);
 
   useEffect(() => {
@@ -238,43 +317,39 @@ export function ReaderPage() {
 
   // ── Word hover ───────────────────────────────────────────────────────────
   const handleWordMouseEnter = (e: React.MouseEvent<HTMLSpanElement>, rawWord: string) => {
-    const word = rawWord.trim();
-    if (!word) return;
-    const rect = e.currentTarget.getBoundingClientRect();
+    const word = rawWord.replace(/[^a-zA-Z'-]/g, '').toLowerCase().trim();
+    if (!word || word.length < 2) return;
+
     clearTimeout(hoverTimeoutRef.current);
+    clearTimeout(hideTimeoutRef.current);
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top - 8;
+
     hoverTimeoutRef.current = setTimeout(async () => {
-      const entry = lookupWord(word);
-      if (entry) {
-        setHoveredWord({ word, x: rect.left + rect.width / 2, y: rect.top - 10, translation: entry.t, pos: entry.pos, translating: false });
-        return;
-      }
-      setHoveredWord({ word, x: rect.left + rect.width / 2, y: rect.top - 10, translation: null, pos: '', translating: true });
-      try {
-        const result = await googleTranslate(word);
-        setHoveredWord(prev => prev?.word === word ? { ...prev, translation: result, translating: false } : prev);
-      } catch {
-        setHoveredWord(prev => prev?.word === word ? { ...prev, translation: null, translating: false } : prev);
-      }
-    }, 350);
+      setTooltip({ word, x, y, info: null, loading: true });
+      const info = await lookupWord(word);
+      setTooltip(prev => prev?.word === word ? { ...prev, info, loading: false } : prev);
+    }, 400);
   };
 
   const handleWordMouseLeave = () => {
     clearTimeout(hoverTimeoutRef.current);
-    hoverTimeoutRef.current = setTimeout(() => setHoveredWord(null), 250);
+    hideTimeoutRef.current = setTimeout(() => setTooltip(null), 300);
   };
 
-  const handleAddWord = async () => {
-    if (!hoveredWord || !hoveredWord.translation) return;
-    await addWordToDictionary(hoveredWord.word, hoveredWord.translation, undefined, hoveredWord.pos || undefined);
-    toast({ title: 'Добавлено в словарь', description: `"${hoveredWord.word}" сохранено.`, duration: 2000 });
-    setHoveredWord(null);
+  const handleAddWord = async (word: string, translation: string, pos?: string) => {
+    await addWordToDictionary(word, translation, undefined, pos);
+    toast({ title: 'Добавлено в словарь', description: `"${word}" → ${translation}`, duration: 2000 });
+    setTooltip(null);
   };
 
-  // ── Sentence / period click ──────────────────────────────────────────────
+  // ── Sentence click ───────────────────────────────────────────────────────
   const handleSentenceClick = async (sentence: string) => {
     const text = sentence.trim();
     if (!text) return;
-    setHoveredWord(null);
+    setTooltip(null);
     setSelectedSentence(text);
     setSentenceTranslation(null);
     setSentenceGrammar(analyzeGrammar(text));
@@ -282,7 +357,7 @@ export function ReaderPage() {
     setTranslating(true);
     if (showHint) { setShowHint(false); localStorage.setItem('reader-hint-dismissed', '1'); }
     try {
-      const result = await googleTranslate(text);
+      const result = await translateSentence(text);
       setSentenceTranslation(result);
     } catch {
       setSentenceTranslation('Не удалось получить перевод. Проверьте интернет-соединение.');
@@ -295,10 +370,7 @@ export function ReaderPage() {
   const handleJumpSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const n = parseInt(jumpValue, 10);
-    if (!isNaN(n) && n >= 1 && n <= pages.length) {
-      setCurrentPageIdx(n - 1);
-      setSelectedSentence(null); setSentenceTranslation(null); setSentenceGrammar(null);
-    }
+    if (!isNaN(n) && n >= 1 && n <= pages.length) { setCurrentPageIdx(n - 1); closeSentencePanel(); }
     setEditingPage(false); setJumpValue('');
   };
 
@@ -317,17 +389,13 @@ export function ReaderPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col selection:bg-primary/20">
-      {/* Header */}
       <header className="h-14 flex items-center justify-between px-4 border-b border-border/40 shrink-0 sticky top-0 bg-background/90 backdrop-blur-md z-20">
         <div className="flex items-center gap-2">
           <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors p-2 rounded-full hover:bg-muted">
             <ArrowLeft size={20} />
           </Link>
-          <button
-            onClick={() => setShowToc(v => !v)}
-            className={`p-2 rounded-full transition-colors ${showToc ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
-            title="Оглавление"
-          >
+          <button onClick={() => setShowToc(v => !v)}
+            className={`p-2 rounded-full transition-colors ${showToc ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}>
             <List size={20} />
           </button>
           <div className="hidden md:block ml-1">
@@ -347,30 +415,26 @@ export function ReaderPage() {
       </header>
 
       <div className="flex flex-1 overflow-hidden relative">
-        {/* TOC Panel (left) */}
+        {/* TOC */}
         <AnimatePresence>
           {showToc && (
             <motion.aside key="toc" initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }}
               transition={{ type: 'spring', stiffness: 320, damping: 32 }}
               className="fixed left-0 top-14 bottom-0 w-[280px] bg-card border-r border-border flex flex-col z-30 shadow-xl">
               <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
-                <span className="font-semibold text-sm flex items-center gap-2">
-                  <BookOpen size={15} className="text-primary" /> Оглавление
-                </span>
-                <button onClick={() => setShowToc(false)} className="p-1.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground">
-                  <X size={16} />
-                </button>
+                <span className="font-semibold text-sm flex items-center gap-2"><BookOpen size={15} className="text-primary" />Оглавление</span>
+                <button onClick={() => setShowToc(false)} className="p-1.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground"><X size={16} /></button>
               </div>
               <div className="flex-1 overflow-y-auto py-2">
-                {tocEntries.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">Нет глав</p>
-                ) : tocEntries.map((entry, i) => (
-                  <button key={i} onClick={() => { setCurrentPageIdx(entry.pageIdx); setSelectedSentence(null); setSentenceTranslation(null); setSentenceGrammar(null); setShowToc(false); }}
-                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-muted/70 flex items-start gap-3 ${i === activeChapterIdx ? 'text-primary font-semibold bg-primary/5' : 'text-foreground/80'}`}>
-                    <span className="text-xs text-muted-foreground mt-0.5 shrink-0 w-5 text-right">{i + 1}</span>
-                    <span className="leading-snug">{entry.title || `Глава ${i + 1}`}</span>
-                  </button>
-                ))}
+                {tocEntries.length === 0
+                  ? <p className="text-sm text-muted-foreground text-center py-8">Нет глав</p>
+                  : tocEntries.map((entry, i) => (
+                    <button key={i} onClick={() => { setCurrentPageIdx(entry.pageIdx); closeSentencePanel(); setShowToc(false); }}
+                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-muted/70 flex items-start gap-3 ${i === activeChapterIdx ? 'text-primary font-semibold bg-primary/5' : 'text-foreground/80'}`}>
+                      <span className="text-xs text-muted-foreground mt-0.5 shrink-0 w-5 text-right">{i + 1}</span>
+                      <span className="leading-snug">{entry.title || `Глава ${i + 1}`}</span>
+                    </button>
+                  ))}
               </div>
               <div className="p-4 border-t border-border shrink-0">
                 <p className="text-xs text-muted-foreground mb-2">Перейти на страницу</p>
@@ -396,15 +460,14 @@ export function ReaderPage() {
           </button>
 
           <div className={`w-full ${widthClass} px-8 md:px-12 py-8 max-h-full overflow-y-auto`}>
-            {/* One-time hint banner */}
             <AnimatePresence>
               {showHint && (
                 <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
                   className="mb-5 flex items-center gap-3 bg-primary/8 border border-primary/20 rounded-2xl px-4 py-3 text-sm text-foreground/80">
                   <span className="text-base shrink-0">💡</span>
-                  <span>Нажмите на <span className="text-primary font-semibold">точку · в конце предложения</span> — получите перевод и разбор грамматики</span>
+                  <span>Наведите на <span className="text-primary font-semibold">слово</span> — увидите перевод и значения. Нажмите на <span className="text-primary font-semibold">точку</span> — перевод предложения</span>
                   <button onClick={() => { setShowHint(false); localStorage.setItem('reader-hint-dismissed', '1'); }}
-                    className="ml-auto shrink-0 p-1 rounded-full hover:bg-primary/15 text-muted-foreground hover:text-foreground transition-colors">
+                    className="ml-auto shrink-0 p-1 rounded-full hover:bg-primary/15 text-muted-foreground hover:text-foreground">
                     <X size={14} />
                   </button>
                 </motion.div>
@@ -417,43 +480,35 @@ export function ReaderPage() {
                 {page.isChapterStart && page.title && (
                   <h2 className="font-serif text-center font-bold mb-6 text-primary/60 text-[1.1em]">{page.title}</h2>
                 )}
-
                 <div className="space-y-2">
                   {page.paragraphs.map((para, pi) => {
                     const sentences = splitSentences(para);
                     return (
                       <p key={pi} className="text-foreground/90 text-justify">
                         {sentences.map((sentence, si) => {
-                          // Split sentence into body + trailing punctuation
                           const punctMatch = sentence.match(/^([\s\S]*?)([.!?…]+["'»]?\s*)$/);
                           const body = punctMatch ? punctMatch[1] : sentence;
                           const punct = punctMatch ? punctMatch[2] : '';
                           const isSelected = selectedSentence === sentence.trim();
-
                           return (
                             <span key={si} className={`rounded transition-colors ${isSelected ? 'bg-primary/10' : ''}`}>
-                              {/* Word tokens in the body */}
                               {body.split(/(\s+)/).map((token, wi) => {
                                 if (token.trim() === '') return <span key={wi}>{token}</span>;
-                                const clean = token.replace(/[.,!?;:"'()[\]{}—…«»]/g, '');
+                                const clean = token.replace(/[^a-zA-Z'-]/g, '');
+                                if (!clean || clean.length < 2) return <span key={wi}>{token}</span>;
                                 return (
                                   <span key={wi}
-                                    className="hover:bg-primary/25 rounded px-[1px] transition-colors cursor-default"
-                                    onMouseEnter={e => { e.stopPropagation(); handleWordMouseEnter(e, clean); }}
+                                    className="hover:bg-primary/20 rounded px-[1px] transition-colors cursor-default"
+                                    onMouseEnter={e => handleWordMouseEnter(e, clean)}
                                     onMouseLeave={handleWordMouseLeave}
                                     onClick={e => e.stopPropagation()}>
                                     {token}
                                   </span>
                                 );
                               })}
-                              {/* Clickable punctuation dot */}
                               {punct && (
-                                <button
-                                  onClick={() => handleSentenceClick(sentence)}
-                                  title="Нажмите для перевода и разбора предложения"
-                                  className={`inline font-bold transition-colors rounded px-[1px] ${isSelected ? 'text-primary' : 'text-primary/50 hover:text-primary'}`}
-                                  style={{ cursor: 'pointer' }}
-                                >
+                                <button onClick={() => handleSentenceClick(sentence)} title="Перевести предложение"
+                                  className={`inline font-bold transition-colors rounded px-[1px] cursor-pointer ${isSelected ? 'text-primary' : 'text-primary/50 hover:text-primary'}`}>
                                   {punct}
                                 </button>
                               )}
@@ -469,14 +524,12 @@ export function ReaderPage() {
           </div>
         </main>
 
-        {/* Sentence panel (right) — Translation + Grammar */}
+        {/* Sentence / Grammar panel */}
         <AnimatePresence>
           {selectedSentence && (
             <motion.aside key="panel" initial={{ x: 380 }} animate={{ x: 0 }} exit={{ x: 380 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
               className="fixed right-0 top-14 bottom-0 w-[380px] bg-card border-l border-border flex flex-col z-30 shadow-xl">
-
-              {/* Panel header */}
               <div className="flex items-center justify-between px-4 pt-4 pb-0 shrink-0">
                 <div className="flex gap-1 bg-muted p-1 rounded-xl">
                   <button onClick={() => setPanelTab('translate')}
@@ -488,20 +541,15 @@ export function ReaderPage() {
                     <Microscope size={14} /> Грамматика
                   </button>
                 </div>
-                <button onClick={() => { setSelectedSentence(null); setSentenceTranslation(null); setSentenceGrammar(null); }}
-                  className="p-1.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground ml-2">
+                <button onClick={closeSentencePanel} className="p-1.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground ml-2">
                   <X size={16} />
                 </button>
               </div>
-
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {/* Original sentence (always shown) */}
                 <div className="bg-muted/50 rounded-xl p-3">
                   <p className="text-xs text-muted-foreground font-medium mb-1 uppercase tracking-wide">Оригинал</p>
                   <p className="text-sm text-foreground/90 leading-relaxed font-serif italic">{selectedSentence}</p>
                 </div>
-
-                {/* Tab: Translation */}
                 {panelTab === 'translate' && (
                   <div>
                     <p className="text-xs text-muted-foreground font-medium mb-1.5 uppercase tracking-wide">Перевод</p>
@@ -511,14 +559,12 @@ export function ReaderPage() {
                     }
                   </div>
                 )}
-
-                {/* Tab: Grammar */}
                 {panelTab === 'grammar' && sentenceGrammar && (
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-2">
                       <div className="bg-muted/60 rounded-xl p-3">
-                        <p className="text-xs text-muted-foreground mb-1">Тип предложения</p>
-                        <p className="text-sm font-semibold text-foreground">{sentenceGrammar.sentenceType}</p>
+                        <p className="text-xs text-muted-foreground mb-1">Тип</p>
+                        <p className="text-sm font-semibold">{sentenceGrammar.sentenceType}</p>
                       </div>
                       <div className="bg-muted/60 rounded-xl p-3">
                         <p className="text-xs text-muted-foreground mb-1">Время</p>
@@ -527,7 +573,7 @@ export function ReaderPage() {
                     </div>
                     <div className="bg-muted/60 rounded-xl p-3">
                       <p className="text-xs text-muted-foreground mb-1">Залог</p>
-                      <p className="text-sm font-semibold text-foreground">{sentenceGrammar.voice}</p>
+                      <p className="text-sm font-semibold">{sentenceGrammar.voice}</p>
                     </div>
                     {sentenceGrammar.constructions.length > 0 && (
                       <div className="bg-muted/60 rounded-xl p-3">
@@ -555,11 +601,8 @@ export function ReaderPage() {
         </AnimatePresence>
       </div>
 
-      {/* Footer */}
       <footer className="h-9 shrink-0 flex items-center justify-center gap-3 text-xs text-muted-foreground border-t border-border/30">
-        <button onClick={handlePrev} disabled={currentPageIdx === 0} className="p-1 hover:text-foreground disabled:opacity-30 transition-colors">
-          <ChevronLeft size={14} />
-        </button>
+        <button onClick={handlePrev} disabled={currentPageIdx === 0} className="p-1 hover:text-foreground disabled:opacity-30 transition-colors"><ChevronLeft size={14} /></button>
         {editingPage ? (
           <form onSubmit={handleJumpSubmit} className="flex items-center gap-1">
             <input autoFocus type="number" min={1} max={pages.length} value={jumpValue}
@@ -570,47 +613,22 @@ export function ReaderPage() {
           </form>
         ) : (
           <button onClick={() => { setEditingPage(true); setJumpValue(String(currentPageIdx + 1)); }}
-            className="hover:text-foreground transition-colors hover:bg-muted px-2 py-0.5 rounded" title="Нажмите для перехода на страницу">
+            className="hover:text-foreground transition-colors hover:bg-muted px-2 py-0.5 rounded" title="Нажмите для перехода">
             Страница {currentPageIdx + 1} из {pages.length}
           </button>
         )}
-        <button onClick={handleNext} disabled={currentPageIdx === pages.length - 1} className="p-1 hover:text-foreground disabled:opacity-30 transition-colors">
-          <ChevronRight size={14} />
-        </button>
+        <button onClick={handleNext} disabled={currentPageIdx === pages.length - 1} className="p-1 hover:text-foreground disabled:opacity-30 transition-colors"><ChevronRight size={14} /></button>
       </footer>
 
       {/* Word tooltip */}
       <AnimatePresence>
-        {hoveredWord && (
-          <motion.div initial={{ opacity: 0, y: 8, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: 0.95 }}
-            transition={{ duration: 0.12 }} className="fixed z-50 pointer-events-auto"
-            style={{ left: hoveredWord.x, top: hoveredWord.y, transform: 'translate(-50%, -100%)' }}
-            onMouseEnter={() => clearTimeout(hoverTimeoutRef.current)}
-            onMouseLeave={handleWordMouseLeave}>
-            <div className="bg-card border border-border shadow-2xl rounded-2xl p-4 w-60">
-              <div className="flex justify-between items-start mb-2 gap-2">
-                <div className="min-w-0">
-                  <h4 className="font-bold text-lg text-foreground leading-tight truncate">{hoveredWord.word}</h4>
-                  {hoveredWord.pos && <span className="text-[11px] text-muted-foreground uppercase tracking-wide">{hoveredWord.pos}</span>}
-                </div>
-                <button onClick={e => { e.stopPropagation(); speak(hoveredWord.word); }}
-                  className="p-1.5 bg-muted text-muted-foreground hover:text-primary rounded-full transition-colors shrink-0 text-base">🔊</button>
-              </div>
-              {hoveredWord.translating ? (
-                <div className="flex items-center gap-2 text-muted-foreground text-sm mb-3"><Loader2 size={13} className="animate-spin" />Переводим…</div>
-              ) : (
-                <p className={`text-sm mb-3 leading-snug ${hoveredWord.translation ? 'text-foreground font-medium' : 'text-muted-foreground italic'}`}>
-                  {hoveredWord.translation ?? 'Перевод недоступен'}
-                </p>
-              )}
-              {hoveredWord.translation && !hoveredWord.translating && (
-                <button onClick={handleAddWord}
-                  className="w-full flex items-center justify-center gap-1.5 bg-primary/10 text-primary font-medium py-2 rounded-xl hover:bg-primary/20 transition-colors text-sm">
-                  <Plus size={14} /> В словарь
-                </button>
-              )}
-            </div>
-          </motion.div>
+        {tooltip && (
+          <WordTooltip
+            state={tooltip}
+            onMouseEnter={() => clearTimeout(hideTimeoutRef.current)}
+            onMouseLeave={handleWordMouseLeave}
+            onAdd={handleAddWord}
+          />
         )}
       </AnimatePresence>
     </div>

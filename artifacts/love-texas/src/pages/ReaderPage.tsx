@@ -110,19 +110,22 @@ function WordTooltip({
   const translation = info?.translation ?? '';
   const groups: RuGroup[] = info?.groups ?? [];
 
-  // Flatten all group words into a single list, deduplicated
+  // Flatten all group words, dedup, filter out garbage (single chars, non-Cyrillic, POS codes)
+  const isCyrillic = (s: string) => /[а-яёА-ЯЁ]/.test(s);
   const allVariants: string[] = [];
   const seen = new Set<string>();
-  // Add main translation first
   if (translation) {
     seen.add(translation.toLowerCase());
   }
   for (const g of groups) {
     for (const w of g.words) {
-      const low = w.toLowerCase();
+      const trimmed = w.trim();
+      // Skip: empty, single chars, anything without Cyrillic letters, too short
+      if (!trimmed || trimmed.length < 2 || !isCyrillic(trimmed)) continue;
+      const low = trimmed.toLowerCase();
       if (!seen.has(low)) {
         seen.add(low);
-        allVariants.push(w);
+        allVariants.push(trimmed);
       }
     }
   }
@@ -167,14 +170,15 @@ function WordTooltip({
               <Loader2 size={13} className="animate-spin" />Ищем перевод…
             </div>
           ) : translation ? (
-            <div className="mt-1">
-              {/* All translations as comma-separated line */}
-              <p className="text-sm text-foreground/85 leading-relaxed">
-                <span className="font-semibold text-foreground">{translation}</span>
-                {allVariants.length > 0 && (
-                  <span className="text-foreground/70">,&nbsp;{allVariants.join(',\u00A0')}</span>
-                )}
-              </p>
+            <div className="mt-1 space-y-1">
+              {/* Primary translation — bold */}
+              <p className="text-base font-bold text-foreground">{translation}</p>
+              {/* Additional variants on a new line */}
+              {allVariants.length > 0 && (
+                <p className="text-sm text-foreground/65 leading-snug">
+                  {allVariants.join(', ')}
+                </p>
+              )}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground italic py-2">Перевод не найден</p>

@@ -4,17 +4,19 @@ import { BookCard } from '@/components/BookCard';
 import { parseEpub } from '@/lib/epub-parser';
 import { parseFb2 } from '@/lib/fb2-parser';
 import { paginateBook } from '@/lib/paginator';
-import { Plus, Book as BookIcon } from 'lucide-react';
+import { Plus, Book as BookIcon, BookOpen, Clock3, LibraryBig, RefreshCw, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export function LibraryPage() {
   const [books, setBooks] = useState<{ book: Book; progress: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadBooks = async () => {
     try {
+      setError('');
       const allBooks = await getAllBooks();
       const booksWithProgress = await Promise.all(
         allBooks.map(async (book) => {
@@ -25,6 +27,7 @@ export function LibraryPage() {
       setBooks(booksWithProgress.sort((a, b) => b.book.addedAt - a.book.addedAt));
     } catch (err) {
       console.error(err);
+      setError('Не удалось загрузить книги. Попробуйте ещё раз.');
     } finally {
       setLoading(false);
     }
@@ -74,6 +77,7 @@ export function LibraryPage() {
   const handleFileUpload = async (file: File) => {
     if (!file) return;
     setUploading(true);
+    setError('');
     try {
       let parsed;
       if (file.name.endsWith('.epub')) {
@@ -81,7 +85,7 @@ export function LibraryPage() {
       } else if (file.name.endsWith('.fb2')) {
         parsed = await parseFb2(file);
       } else {
-        alert("Поддерживаются только файлы EPUB и FB2.");
+      setError('Поддерживаются только файлы EPUB и FB2.');
         return;
       }
 
@@ -103,7 +107,7 @@ export function LibraryPage() {
       await loadBooks();
     } catch (err) {
       console.error(err);
-      alert("Не удалось открыть книгу. Файл может быть повреждён или не поддерживается.");
+      setError("Не удалось открыть книгу. Файл может быть повреждён или не поддерживается.");
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -119,28 +123,32 @@ export function LibraryPage() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="p-6 md:p-10 max-w-7xl mx-auto"
+      className="relative min-h-[100dvh] p-5 sm:p-8 lg:p-12 max-w-[1500px] mx-auto"
     >
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <div>
-          <h1 className="text-3xl font-serif font-bold text-foreground">Библиотека</h1>
-          <p className="text-muted-foreground mt-1">Уютный уголок для изучения английского</p>
+      <div className="absolute -top-24 -right-28 w-80 h-80 rounded-full bg-accent/25 blur-3xl pointer-events-none" />
+      <div className="relative mb-10 flex flex-col xl:flex-row xl:items-end justify-between gap-7">
+        <div className="max-w-2xl">
+          <div className="flex items-center gap-2 text-primary text-xs font-bold uppercase tracking-[.2em] mb-4">
+            <LibraryBig size={15} /> Личная полка
+          </div>
+          <h1 data-testid="text-library-title" className="font-editorial text-5xl sm:text-6xl font-semibold tracking-[-.04em] text-foreground leading-[.95]">Книги, к которым<br /><em className="text-primary not-italic">хочется вернуться</em></h1>
+          <p className="text-muted-foreground mt-5 max-w-lg leading-relaxed">Читайте в своём ритме, отмечайте новые слова и собирайте английский, который остаётся с вами.</p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           {uploading && (
-            <span className="text-sm text-primary animate-pulse font-medium">Добавляем книгу…</span>
+            <span data-testid="status-uploading" className="text-sm text-primary animate-pulse font-medium flex items-center gap-2"><BookOpen size={16} /> Добавляем книгу…</span>
           )}
-          <button
+           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-full font-medium hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-60"
+             data-testid="button-add-book"
+            className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-3 rounded-xl font-semibold hover:bg-primary/90 transition-colors shadow-[0_8px_18px_hsl(var(--primary)/.22)] disabled:opacity-60"
           >
             <Plus size={18} />
             Добавить книгу
           </button>
-          <input
+           <input data-testid="input-book-upload"
             ref={fileInputRef}
             type="file"
             accept=".epub,.fb2"
@@ -150,16 +158,28 @@ export function LibraryPage() {
         </div>
       </div>
 
-      {/* Books grid — wider cards: fewer columns */}
+      <div className="flex flex-wrap gap-3 mb-6">
+        <div className="inline-flex items-center gap-2 rounded-full bg-card/70 border border-card-border px-3.5 py-2 text-xs text-muted-foreground"><BookOpen size={14} className="text-primary" /><span data-testid="text-library-count">{books.length} {books.length === 1 ? 'книга' : 'книг'}</span></div>
+        <div className="inline-flex items-center gap-2 rounded-full bg-card/70 border border-card-border px-3.5 py-2 text-xs text-muted-foreground"><Clock3 size={14} className="text-primary" />Ваш тихий час для чтения</div>
+      </div>
+      <div data-testid="card-reading-motivation" className="mb-7 max-w-xl flex items-start gap-3 rounded-2xl border border-accent/55 bg-accent/25 px-4 py-3.5">
+        <div className="mt-0.5 rounded-lg bg-card/70 p-2 text-primary"><Sparkles size={16} /></div>
+        <div><p className="text-sm font-semibold text-foreground">Маленький шаг тоже считается</p><p className="text-xs text-muted-foreground mt-0.5">Одна страница сегодня — это уже встреча с английским.</p></div>
+      </div>
+      {error && (
+        <div data-testid="status-library-error" className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-destructive/25 bg-destructive/8 px-4 py-3 text-sm text-destructive">
+          <span>{error}</span><button data-testid="button-retry-library" onClick={loadBooks} className="flex items-center gap-1 font-semibold"><RefreshCw size={14} /> Повторить</button>
+        </div>
+      )}
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="rounded-2xl bg-muted animate-pulse" style={{ paddingBottom: '140%' }} />
+        <div className="shelf-lines rounded-2xl p-5 sm:p-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-5">
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="rounded-[16px] bg-muted/70 animate-pulse aspect-[2/3.05]" />
           ))}
         </div>
       ) : books.length > 0 ? (
         <AnimatePresence>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+          <div className="shelf-lines rounded-2xl p-5 sm:p-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-4 sm:gap-x-6 gap-y-8">
             {books.map((item, idx) => (
               <motion.div
                 key={item.book.id}
@@ -178,15 +198,15 @@ export function LibraryPage() {
           </div>
         </AnimatePresence>
       ) : (
-        <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center text-muted-foreground mb-4">
+        <div className="flex flex-col items-center justify-center py-20 px-6 text-center rounded-2xl border border-dashed border-primary/30 bg-card/55">
+          <div className="w-24 h-24 bg-secondary/60 rounded-[28px] rotate-[-4deg] flex items-center justify-center text-primary mb-5 shadow-sm">
             <BookIcon size={40} />
           </div>
-          <h2 className="text-xl font-medium text-foreground mb-2">Полка пустая</h2>
+          <h2 data-testid="text-library-empty-title" className="font-editorial text-3xl font-semibold text-foreground mb-2">Начните свою полку</h2>
           <p className="text-muted-foreground max-w-sm mb-6">
             Загрузите книгу в формате EPUB или FB2, чтобы начать читать и собирать новые слова.
           </p>
-          <button
+           <button data-testid="button-add-first-book"
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-full font-medium hover:bg-primary/90 transition-colors shadow"
           >

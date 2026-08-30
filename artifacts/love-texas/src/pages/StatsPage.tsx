@@ -41,7 +41,7 @@ export function StatsPage() {
   }, []);
 
   if (loading || !stats) {
-    return <div className="p-10 flex justify-center"><div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin" /></div>;
+    return <div data-testid="status-stats-loading" className="p-8 sm:p-12 max-w-6xl mx-auto space-y-5"><div className="h-16 w-64 bg-muted rounded-2xl animate-pulse" /><div className="grid grid-cols-2 md:grid-cols-4 gap-4">{[1,2,3,4].map(i => <div key={i} className="h-32 bg-muted rounded-2xl animate-pulse" />)}</div><div className="h-72 bg-muted rounded-2xl animate-pulse" /></div>;
   }
 
   const daysActive = Math.max(1, Math.ceil((Date.now() - stats.firstUsed) / (1000 * 60 * 60 * 24)));
@@ -55,10 +55,10 @@ export function StatsPage() {
   };
 
   const cards = [
-    { label: 'Книг прочитано',      value: booksFinished,              icon: BookOpen,   color: 'text-blue-500',   bg: 'bg-blue-100 dark:bg-blue-900/30' },
-    { label: 'Страниц перевёрнуто', value: totalPagesTurned,           icon: FileText,   color: 'text-indigo-500', bg: 'bg-indigo-100 dark:bg-indigo-900/30' },
-    { label: 'Слов в словаре',      value: wordsCount,                 icon: BookMarked, color: 'text-pink-500',   bg: 'bg-pink-100 dark:bg-pink-900/30' },
-    { label: 'Тренировок',          value: stats.totalTrainingsDone,   icon: Brain,      color: 'text-orange-500', bg: 'bg-orange-100 dark:bg-orange-900/30' },
+     { label: 'Книг прочитано',      value: booksFinished,              icon: BookOpen,   color: 'text-primary',   bg: 'bg-primary/10' },
+     { label: 'Страниц перевёрнуто', value: totalPagesTurned,           icon: FileText,   color: 'text-secondary-foreground', bg: 'bg-secondary/60' },
+     { label: 'Слов в словаре',      value: wordsCount,                 icon: BookMarked, color: 'text-primary',   bg: 'bg-accent/45' },
+     { label: 'Тренировок',          value: stats.totalTrainingsDone,   icon: Brain,      color: 'text-destructive', bg: 'bg-destructive/10' },
   ];
 
   const chartData = [
@@ -73,9 +73,10 @@ export function StatsPage() {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-6 md:p-10 max-w-6xl mx-auto">
-      <div className="mb-10">
-        <h1 className="text-3xl font-serif font-bold text-foreground">Ваш прогресс</h1>
-        <p className="text-muted-foreground mt-1">Изучаю английский уже {daysActive} {dayWord(daysActive)}</p>
+       <div className="mb-10">
+         <div className="text-primary text-xs font-bold uppercase tracking-[.2em] mb-3">Тихий, но заметный рост</div>
+         <h1 data-testid="text-stats-title" className="font-editorial text-5xl font-semibold tracking-[-.04em] text-foreground">Ваш прогресс</h1>
+         <p data-testid="text-active-days" className="text-muted-foreground mt-2">Изучаю английский уже {daysActive} {dayWord(daysActive)}</p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
@@ -90,13 +91,13 @@ export function StatsPage() {
             <div className={`w-12 h-12 rounded-full ${card.bg} ${card.color} flex items-center justify-center mb-3`}>
               <card.icon size={24} />
             </div>
-            <div className="text-3xl font-bold text-foreground mb-1">{card.value}</div>
+             <div data-testid={`text-stat-${i}`} className="text-3xl font-bold text-foreground mb-1">{card.value}</div>
             <div className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{card.label}</div>
           </motion.div>
         ))}
       </div>
 
-      <div className="bg-card border border-border rounded-3xl p-6 shadow-sm">
+       <div className="bg-card/85 border border-card-border rounded-3xl p-6 shadow-[0_10px_28px_rgba(57,35,26,.06)]">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold">Рост словарного запаса</h2>
           <div className="flex items-center gap-2 text-sm text-primary font-medium">

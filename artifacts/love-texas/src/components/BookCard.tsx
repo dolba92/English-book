@@ -1,6 +1,6 @@
 import { Book } from '@/lib/storage';
 import { Link } from 'wouter';
-import { Play, Trash2 } from 'lucide-react';
+import { Play, Trash2, FileText, ArrowUpRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface BookCardProps {
@@ -11,11 +11,11 @@ interface BookCardProps {
 
 export function BookCard({ book, progress = 0, onDelete }: BookCardProps) {
   const levelColors: Record<string, string> = {
-    A1: 'bg-emerald-100 text-emerald-700',
-    A2: 'bg-blue-100 text-blue-700',
-    B1: 'bg-amber-100 text-amber-700',
-    B2: 'bg-orange-100 text-orange-700',
-    C1: 'bg-rose-100 text-rose-700',
+    A1: 'bg-secondary text-secondary-foreground',
+    A2: 'bg-accent/50 text-foreground',
+    B1: 'bg-primary/15 text-primary',
+    B2: 'bg-destructive/10 text-destructive',
+    C1: 'bg-foreground/10 text-foreground',
   };
 
   const badgeColor = levelColors[book.level] || levelColors['B1'];
@@ -33,11 +33,12 @@ export function BookCard({ book, progress = 0, onDelete }: BookCardProps) {
     <motion.div
       whileHover={{ y: -4 }}
       transition={{ duration: 0.2 }}
-      className="group flex flex-col bg-card rounded-2xl overflow-hidden shadow-sm hover:shadow-md border border-border/50 transition-shadow"
+      className="group flex flex-col bg-card/90 rounded-[18px] overflow-hidden shadow-[0_10px_24px_rgba(57,35,26,.08)] hover:shadow-[0_16px_32px_rgba(57,35,26,.14)] border border-card-border transition-shadow"
+      data-testid={`card-book-${book.id}`}
     >
       {/* Cover */}
       <div className="relative w-full overflow-hidden bg-muted" style={{ paddingBottom: '150%' }}>
-        <div className="absolute inset-0">
+        <div className="absolute inset-0 book-spine">
           {book.coverUrl ? (
             <img
               src={book.coverUrl}
@@ -45,32 +46,32 @@ export function BookCard({ book, progress = 0, onDelete }: BookCardProps) {
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             />
           ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-primary/30 to-secondary p-4 text-center">
-              <span className="font-serif text-6xl font-bold text-primary/60 leading-none">{titleInitial}</span>
-              <span className="text-xs font-medium text-muted-foreground mt-3 line-clamp-2">{book.author}</span>
+            <div className="w-full h-full flex flex-col items-center justify-center bg-[radial-gradient(circle_at_28%_18%,hsl(var(--accent)/.5),transparent_30%),linear-gradient(145deg,hsl(var(--secondary)),hsl(var(--primary)/.2))] p-4 text-center">
+              <span className="font-editorial text-7xl font-semibold text-foreground/65 leading-none">{titleInitial}</span>
+              <span className="text-[11px] font-medium text-foreground/65 mt-3 line-clamp-2">{book.author}</span>
             </div>
           )}
 
           {/* Level badge */}
           <div className="absolute top-2 right-2">
-            <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${badgeColor}`}>
+              <span data-testid={`badge-level-${book.id}`} className={`px-2 py-0.5 text-xs font-bold rounded-full ${badgeColor}`}>
               {book.level || 'B1'}
             </span>
           </div>
 
           {/* Hover overlay */}
-          <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+          <div className="absolute inset-0 bg-foreground/35 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex items-center justify-center gap-2">
             <Link
               href={`/reader/${book.id}`}
               data-testid={`btn-read-${book.id}`}
-              className="w-10 h-10 rounded-full bg-white/90 text-primary flex items-center justify-center shadow hover:scale-110 transition-transform"
+              className="w-10 h-10 rounded-full bg-card/95 text-primary flex items-center justify-center shadow hover:scale-110 transition-transform"
             >
-              <Play size={18} className="ml-0.5" />
+              <Play size={18} className="ml-0.5" fill="currentColor" />
             </Link>
             <button
               onClick={handleDelete}
               data-testid={`btn-delete-${book.id}`}
-              className="w-10 h-10 rounded-full bg-white/90 text-destructive flex items-center justify-center shadow hover:scale-110 transition-transform"
+              className="w-10 h-10 rounded-full bg-card/95 text-destructive flex items-center justify-center shadow hover:scale-110 transition-transform"
             >
               <Trash2 size={16} />
             </button>
@@ -79,24 +80,27 @@ export function BookCard({ book, progress = 0, onDelete }: BookCardProps) {
       </div>
 
       {/* Info */}
-      <div className="p-3 flex flex-col gap-1">
-        <h3 className="font-bold text-sm text-foreground line-clamp-1" title={book.title}>
+      <div className="p-4 flex flex-col gap-1">
+        <h3 data-testid={`text-book-title-${book.id}`} className="font-editorial font-semibold text-[17px] text-foreground line-clamp-1" title={book.title}>
           {book.title}
         </h3>
-        <p className="text-xs text-muted-foreground line-clamp-1">{book.author}</p>
+        <p data-testid={`text-book-author-${book.id}`} className="text-xs text-muted-foreground line-clamp-1">{book.author}</p>
 
-        <div className="mt-2">
-          <div className="flex justify-between text-xs text-muted-foreground mb-1">
-            <span>Progress</span>
-            <span>{Math.round(progress)}%</span>
+        <div className="mt-3">
+          <div className="flex justify-between text-[11px] text-muted-foreground mb-1.5">
+            <span className="flex items-center gap-1"><FileText size={12} />{book.totalPages} страниц</span>
+            <span data-testid={`text-book-progress-${book.id}`}>{Math.round(progress)}%</span>
           </div>
-          <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+          <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden" aria-label={`Прогресс ${Math.round(progress)} процентов`}>
             <div
               className="bg-primary h-full rounded-full transition-all duration-500"
               style={{ width: `${progress}%` }}
             />
           </div>
         </div>
+        <Link href={`/reader/${book.id}`} data-testid={`link-open-book-${book.id}`} className="mt-3 text-xs font-semibold text-primary flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+          {progress > 0 ? 'Продолжить чтение' : 'Открыть книгу'} <ArrowUpRight size={13} />
+        </Link>
       </div>
     </motion.div>
   );

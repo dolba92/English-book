@@ -17,9 +17,9 @@ export interface WordInfo {
 
 // ── POS names EN → RU short ───────────────────────────────────────────────────
 const POS_RU: Record<string, string> = {
-  noun: 'сущ.', verb: 'гл.', adjective: 'прил.', adverb: 'нар.',
-  pronoun: 'мест.', preposition: 'пред.', conjunction: 'союз',
-  interjection: 'межд.', numeral: 'числ.', particle: 'части.',
+  noun: 'существительное', verb: 'глагол', adjective: 'прилагательное', adverb: 'наречие',
+  pronoun: 'местоимение', preposition: 'предлог', conjunction: 'союз',
+  interjection: 'междометие', numeral: 'числительное', particle: 'частица',
 };
 function posRu(en: string): string {
   return POS_RU[en.toLowerCase()] ?? en;
@@ -63,7 +63,7 @@ async function fromGoogleGtx(word: string): Promise<WordInfo | null> {
     // We'll get it from Lingva if needed; for gtx just skip phonetic
     let phonetic: string | undefined = undefined;
 
-    // Dictionary entries — result[1]: [[pos_en, [[word_ru, [syns_en...], ...]], null, original]]
+    // Dictionary entries — result[1]: [[pos_en, [word_ru, ...], details, original], ...]
     const groups: RuGroup[] = [];
     const bdRaw: any[] = json?.[1] ?? [];
     for (const entry of bdRaw) {
@@ -71,9 +71,10 @@ async function fromGoogleGtx(word: string): Promise<WordInfo | null> {
       const pos = posRu(posEn);
       const items: any[] = entry?.[1] ?? [];
       const words: string[] = items
-        .map((item: any) => (item?.[0] as string | undefined)?.trim() ?? '')
+        .map((item: any) => (typeof item === 'string' ? item : item?.[0])?.trim() ?? '')
         .filter(Boolean)
-        .slice(0, 6);
+        .filter((item: string) => item.length > 1)
+        .slice(0, 10);
       if (words.length) groups.push({ pos, words });
     }
 

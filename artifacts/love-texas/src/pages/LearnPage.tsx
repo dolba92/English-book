@@ -102,7 +102,7 @@ export function LearnPage() {
           <h1 className="text-3xl font-serif font-bold text-foreground">Тренировка</h1>
           <p className="text-muted-foreground mt-1 text-sm">{words.length} {wordForm(words.length)} в словаре</p>
         </div>
-        <button
+        <button data-testid="button-toggle-repeat-settings"
           onClick={() => setShowFreqPanel(v => !v)}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-colors ${showFreqPanel ? 'bg-primary/10 border-primary/30 text-primary' : 'border-border bg-card text-muted-foreground hover:text-foreground hover:border-primary/30'}`}
         >
@@ -124,7 +124,7 @@ export function LearnPage() {
               </p>
               <div className="flex flex-wrap gap-2">
                 {freqOptions.map(opt => (
-                  <button key={opt.days} onClick={() => updateFreq(opt.days)}
+                  <button data-testid={`button-repeat-frequency-${opt.days}`} key={opt.days} onClick={() => updateFreq(opt.days)}
                     className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-colors ${srs.hardPenaltyDays === opt.days ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-muted/30 text-muted-foreground hover:border-primary/40 hover:text-foreground'}`}>
                     {opt.label}
                   </button>
@@ -174,12 +174,12 @@ export function LearnPage() {
             {dueCount > 0
               ? <><span className="font-semibold">{dueCount} {wordForm(dueCount)}</span> ждут повторения — сначала покажем их</>
               : words.length >= 100
-              ? <>Всё повторено 🎉 Добавьте новые слова или ждите следующей волны</>
-              : <>Всё повторено на сегодня 🎉 Следующие слова появятся позже</>
+              ? <>Всё повторено. Добавьте новые слова или ждите следующей волны</>
+              : <>Всё повторено на сегодня. Следующие слова появятся позже</>
             }
           </div>
           {dueCount > 0 && (
-            <button onClick={() => setActiveMode('flashcards')}
+            <button data-testid="button-start-due-training" onClick={() => setActiveMode('flashcards')}
               className="shrink-0 bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors">
               Начать
             </button>
@@ -198,7 +198,7 @@ export function LearnPage() {
             : dueCount;
 
           return (
-            <motion.div key={mode.id}
+            <motion.div data-testid={`card-training-mode-${mode.id}`} key={mode.id}
               whileHover={!isLocked ? { scale: 1.02, y: -2 } : {}}
               onClick={() => !isLocked && setActiveMode(mode.id as TrainingMode)}
               className={`p-6 rounded-3xl border-2 transition-all relative ${isLocked ? 'bg-muted/50 border-transparent opacity-50 cursor-not-allowed' : 'bg-card border-border hover:border-primary/50 cursor-pointer shadow-sm hover:shadow-md'}`}>
@@ -312,7 +312,7 @@ function TrainingSession({ mode, words, onFinish }: { mode: TrainingMode; words:
   if (sessionWords.length === 0) return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 text-center">
       <p className="text-muted-foreground text-lg">Нет слов для тренировки</p>
-      <button onClick={onFinish} className="bg-primary text-primary-foreground px-6 py-3 rounded-full font-bold">← Назад</button>
+      <button data-testid="button-training-back" onClick={onFinish} className="bg-primary text-primary-foreground px-6 py-3 rounded-full font-bold">← Назад</button>
     </div>
   );
 
@@ -344,7 +344,7 @@ function TrainingSession({ mode, words, onFinish }: { mode: TrainingMode; words:
             Следующее повторение: <span className="text-primary font-medium">{formatNextReview(nextWord.nextReviewAt)}</span>
           </p>
         )}
-        <button onClick={onFinish}
+        <button data-testid="button-training-finished" onClick={onFinish}
           className="bg-primary text-primary-foreground px-8 py-3 rounded-full font-bold shadow-lg hover:shadow-xl transition-all hover:scale-105">
           К режимам
         </button>
@@ -356,9 +356,9 @@ function TrainingSession({ mode, words, onFinish }: { mode: TrainingMode; words:
   const streak = currentWord?.successStreak ?? 0;
   const isDue = isWordDue(currentWord ?? {});
   const wordLabel =
-    isWordKnown(currentWord ?? {}) ? `⭐ Знаю (повторение)` :
-    streak === 0 ? '🆕 Новое слово' :
-    isDue ? `🔁 Повторение — ${streak}/${KNOWN_THRESHOLD}` : null;
+    isWordKnown(currentWord ?? {}) ? `Знаю — повторение` :
+    streak === 0 ? 'Новое слово' :
+    isDue ? `Повторение — ${streak}/${KNOWN_THRESHOLD}` : null;
 
   const renderMode = () => {
     switch (mode) {
@@ -366,7 +366,7 @@ function TrainingSession({ mode, words, onFinish }: { mode: TrainingMode; words:
       case 'hard':
         return (
           <div className="flex flex-col items-center w-full max-w-sm mx-auto">
-            <div className="w-full aspect-[4/3] relative cursor-pointer mb-8" onClick={() => !flipped && setFlipped(true)}>
+            <div data-testid="card-flashcard" className="w-full aspect-[4/3] relative cursor-pointer mb-8" onClick={() => !flipped && setFlipped(true)}>
               <motion.div className="w-full h-full absolute inset-0 bg-card border-2 border-border rounded-3xl flex flex-col items-center justify-center shadow-md text-center p-6"
                 animate={{ rotateY: flipped ? 90 : 0, opacity: flipped ? 0 : 1 }} transition={{ duration: 0.2 }}>
                 <h3 className="text-3xl font-bold">{currentWord.word}</h3>
@@ -382,11 +382,11 @@ function TrainingSession({ mode, words, onFinish }: { mode: TrainingMode; words:
             <AnimatePresence>
               {flipped && (
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-4 w-full">
-                  <button onClick={() => advance(false)}
+                  <button data-testid="button-answer-learning" onClick={() => advance(false)}
                     className="flex-1 py-4 rounded-2xl bg-destructive/10 text-destructive font-bold border border-destructive/20 hover:bg-destructive hover:text-white transition-colors">
                     Ещё учу
                   </button>
-                  <button onClick={() => advance(true)}
+                  <button data-testid="button-answer-known" onClick={() => advance(true)}
                     className="flex-1 py-4 rounded-2xl bg-green-100 text-green-700 font-bold border border-green-200 hover:bg-green-500 hover:text-white transition-colors">
                     Знаю!
                   </button>
@@ -412,7 +412,7 @@ function TrainingSession({ mode, words, onFinish }: { mode: TrainingMode; words:
                   else cls = 'border-border bg-muted/30 text-muted-foreground';
                 }
                 return (
-                  <button key={i} disabled={!!choicePicked}
+                  <button data-testid={`button-choice-${i}`} key={i} disabled={!!choicePicked}
                     onClick={() => { setChoicePicked(opt); setTimeout(() => advance(isCorrect), 700); }}
                     className={`py-4 px-3 rounded-2xl border-2 text-sm font-medium transition-all ${cls}`}>
                     {opt}
@@ -451,18 +451,18 @@ function TrainingSession({ mode, words, onFinish }: { mode: TrainingMode; words:
             </div>
             <div className="flex flex-wrap justify-center gap-2 mb-6">
               {anagramTiles.map(tile => (
-                <button key={tile.id} onClick={() => handleTileClick(tile)} disabled={tile.used || !!feedback}
+                <button data-testid={`button-anagram-tile-${tile.id}`} key={tile.id} onClick={() => handleTileClick(tile)} disabled={tile.used || !!feedback}
                   className={`w-11 h-11 rounded-xl text-lg font-bold border-2 transition-all ${tile.used ? 'border-border bg-muted/30 text-muted-foreground/30 cursor-not-allowed' : 'border-border bg-card hover:border-primary hover:bg-primary/10 text-foreground shadow-sm active:scale-95'}`}>
                   {tile.letter}
                 </button>
               ))}
             </div>
             <div className="flex gap-3 justify-center">
-              <button onClick={handleUndo} disabled={anagramAnswer.length === 0 || !!feedback}
+              <button data-testid="button-anagram-undo" onClick={handleUndo} disabled={anagramAnswer.length === 0 || !!feedback}
                 className="px-4 py-2 rounded-xl border border-border text-sm text-muted-foreground hover:text-foreground hover:border-foreground transition-colors disabled:opacity-40">
                 <RotateCcw size={16} />
               </button>
-              <button
+              <button data-testid="button-anagram-check"
                 onClick={() => { const t = anagramAnswer.map(a => a.letter).join(''); advance(t.toLowerCase() === currentWord.word.toLowerCase()); }}
                 disabled={!allUsed || !!feedback}
                 className="px-6 py-2 rounded-xl bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors disabled:opacity-40">
@@ -483,7 +483,7 @@ function TrainingSession({ mode, words, onFinish }: { mode: TrainingMode; words:
             <p className="text-sm text-muted-foreground mb-3 uppercase tracking-wide">{isEn ? 'Напишите по-английски' : 'Напишите по-русски'}</p>
             <h3 className="text-4xl font-bold mb-10">{prompt}</h3>
             <form onSubmit={e => { e.preventDefault(); if (!feedback) advance(inputVal.trim().toLowerCase() === target.toLowerCase()); }}>
-              <input ref={inputRef} value={inputVal} onChange={e => setInputVal(e.target.value)}
+              <input data-testid="input-training-answer" ref={inputRef} value={inputVal} onChange={e => setInputVal(e.target.value)}
                 placeholder={isEn ? 'Введите английское слово…' : 'Введите перевод на русском…'}
                 disabled={!!feedback}
                 className={`w-full text-center text-2xl p-4 border-b-2 bg-transparent outline-none transition-colors ${feedback === 'correct' ? 'border-green-500 text-green-600' : feedback === 'incorrect' ? 'border-destructive text-destructive' : 'border-primary text-foreground'}`} />
@@ -510,13 +510,13 @@ function TrainingSession({ mode, words, onFinish }: { mode: TrainingMode; words:
               <p className="text-2xl font-serif">{tfShown}</p>
             </div>
             <div className="flex gap-4">
-              <button disabled={!!feedback} onClick={() => advance(!tfCorrect)}
+               <button data-testid="button-answer-false" disabled={!!feedback} onClick={() => advance(!tfCorrect)}
                 className="flex-1 py-4 rounded-2xl border-2 border-destructive/30 bg-destructive/5 text-destructive font-bold hover:bg-destructive hover:text-white transition-colors disabled:opacity-50">
-                ✗ Нет
+                 Нет
               </button>
-              <button disabled={!!feedback} onClick={() => advance(tfCorrect)}
+               <button data-testid="button-answer-true" disabled={!!feedback} onClick={() => advance(tfCorrect)}
                 className="flex-1 py-4 rounded-2xl border-2 border-green-300 bg-green-50 text-green-700 font-bold hover:bg-green-500 hover:text-white transition-colors disabled:opacity-50">
-                ✓ Да
+                 Да
               </button>
             </div>
           </div>
@@ -529,12 +529,12 @@ function TrainingSession({ mode, words, onFinish }: { mode: TrainingMode; words:
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background">
       <div className="flex items-center justify-between px-6 pt-6 pb-2 shrink-0">
-        <button onClick={onFinish} className="text-sm text-muted-foreground hover:text-foreground transition-colors">← Выйти</button>
+        <button data-testid="button-training-exit" onClick={onFinish} className="text-sm text-muted-foreground hover:text-foreground transition-colors">← Выйти</button>
         <div className="flex items-center gap-3">
           {wordLabel && (
             <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">{wordLabel}</span>
           )}
-          <span className="text-sm font-medium text-muted-foreground">{currentIndex + 1} / {sessionWords.length}</span>
+            <span data-testid="text-training-progress" className="text-sm font-medium text-muted-foreground">{currentIndex + 1} / {sessionWords.length}</span>
         </div>
       </div>
 
@@ -548,7 +548,7 @@ function TrainingSession({ mode, words, onFinish }: { mode: TrainingMode; words:
         {feedback && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
             className={`mx-6 mb-4 py-2 rounded-xl text-center text-sm font-bold ${feedback === 'correct' ? 'bg-green-100 text-green-700' : 'bg-destructive/10 text-destructive'}`}>
-            {feedback === 'correct' ? '✓ Верно!' : '✗ Неверно'}
+            {feedback === 'correct' ? 'Верно' : 'Неверно'}
           </motion.div>
         )}
       </AnimatePresence>

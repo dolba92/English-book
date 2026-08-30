@@ -109,26 +109,28 @@ function WordTooltip({
   const { word, x, y, info, loading } = state;
   const translation = info?.translation ?? '';
   const groups: RuGroup[] = info?.groups ?? [];
+  const [selectedGroup, setSelectedGroup] = React.useState(0);
 
-  // Flatten all group words, dedup, filter out garbage (single chars, non-Cyrillic, POS codes)
+  React.useEffect(() => {
+    setSelectedGroup(0);
+  }, [word]);
+
+  // Keep only real Russian variants and remove the main translation from alternatives.
   const isCyrillic = (s: string) => /[а-яёА-ЯЁ]/.test(s);
-  const allVariants: string[] = [];
-  const seen = new Set<string>();
-  if (translation) {
-    seen.add(translation.toLowerCase());
-  }
-  for (const g of groups) {
-    for (const w of g.words) {
-      const trimmed = w.trim();
-      // Skip: empty, single chars, anything without Cyrillic letters, too short
-      if (!trimmed || trimmed.length < 2 || !isCyrillic(trimmed)) continue;
-      const low = trimmed.toLowerCase();
-      if (!seen.has(low)) {
+  const cleanVariants = (words: string[]) => {
+    const seen = new Set<string>();
+    return words
+      .map(w => w.trim())
+      .filter(w => w.length > 1 && isCyrillic(w))
+      .filter(w => {
+        const low = w.toLowerCase();
+        if (low === translation.toLowerCase() || seen.has(low)) return false;
         seen.add(low);
-        allVariants.push(trimmed);
-      }
-    }
-  }
+        return true;
+      });
+  };
+  const activeGroup = groups[selectedGroup] ?? groups[0];
+  const activeVariants = activeGroup ? cleanVariants(activeGroup.words) : [];
 
   // Clamp tooltip so it doesn't go off-screen left/right
   const safeX = Math.max(148, Math.min(window.innerWidth - 148, x));
@@ -144,11 +146,11 @@ function WordTooltip({
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
-      <div className="bg-card border border-border shadow-2xl rounded-2xl w-72 overflow-hidden">
+      <div className="bg-card border border-border shadow-2xl rounded-2xl w-[min(18rem,calc(100vw-2rem))] overflow-hidden">
         {/* Header: word + speak button */}
         <div className="flex items-center gap-2 px-4 pt-4 pb-1">
           <span className="flex-1 font-bold text-xl text-foreground leading-tight">{word}</span>
-          <button
+           <button data-testid="button-speak-word" aria-label={`Произнести ${word}`}
             onClick={e => { e.stopPropagation(); speak(word); }}
             className="p-1.5 bg-muted text-muted-foreground hover:text-primary rounded-full transition-colors shrink-0"
           >
@@ -172,11 +174,31 @@ function WordTooltip({
           ) : translation ? (
             <div className="mt-1 space-y-1">
               {/* Primary translation — bold */}
-              <p className="text-base font-bold text-foreground">{translation}</p>
-              {/* Additional variants on a new line */}
-              {allVariants.length > 0 && (
-                <p className="text-sm text-foreground/65 leading-snug">
-                  {allVariants.join(', ')}
+              <p data-testid="text-word-main-translation" className="text-base font-bold text-foreground">{translation}</p>
+              {/* Parts of speech are selectable when the dictionary has several groups */}
+              {groups.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-2">
+                  {groups.map((group, index) => (
+                    <button
+                      key={`${group.pos}-${index}`}
+                      type="button"
+                      data-testid={`button-word-pos-${index}`}
+                      onClick={e => { e.stopPropagation(); setSelectedGroup(index); }}
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                        selectedGroup === index
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {group.pos}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {/* Secondary meanings from the selected part of speech */}
+              {activeVariants.length > 0 && (
+                <p data-testid="text-word-secondary-translations" className="text-sm italic text-foreground/65 leading-snug pt-1">
+                  {activeVariants.join(', ')}
                 </p>
               )}
             </div>
@@ -187,7 +209,7 @@ function WordTooltip({
 
         {/* Add to dictionary */}
         <div className="px-3 pb-3">
-          <button
+           <button data-testid="button-add-word" aria-label="Добавить слово в словарь"
             disabled={loading || !translation}
             onClick={() => onAdd(word, translation)}
             className="w-full flex items-center justify-center gap-1.5 bg-primary/10 text-primary font-medium py-2 rounded-xl hover:bg-primary/20 transition-colors text-sm disabled:opacity-40 disabled:cursor-not-allowed"
@@ -213,8 +235,8 @@ export function ReaderPage() {
   const [loading, setLoading] = useState(true);
 
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
-  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const [selectedSentence, setSelectedSentence] = useState<string | null>(null);
   const [sentenceTranslation, setSentenceTranslation] = useState<string | null>(null);
@@ -349,7 +371,7 @@ export function ReaderPage() {
     setEditingPage(false); setJumpValue('');
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Загрузка…</div>;
+  if (loading) return <div data-testid="status-reader-loading" className="min-h-[100dvh] flex flex-col items-center justify-center gap-3 text-muted-foreground"><div className="h-8 w-8 rounded-full border-2 border-primary/25 border-t-primary animate-spin" /><span>Открываем книгу…</span></div>;
   if (!book || pages.length === 0) return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4">
       <p className="text-muted-foreground text-lg">В книге нет читаемого текста.</p>
@@ -363,13 +385,13 @@ export function ReaderPage() {
   const fontCss = getFontCss(settings.fontFamily);
 
   return (
-    <div className="h-screen bg-background text-foreground flex flex-col selection:bg-primary/20 overflow-hidden">
+    <div className="min-h-0 h-[calc(100dvh-64px)] md:min-h-[100dvh] md:h-[100dvh] bg-background text-foreground flex flex-col selection:bg-primary/20 overflow-hidden">
       <header className="h-14 flex items-center justify-between px-4 border-b border-border/40 shrink-0 sticky top-0 bg-background/90 backdrop-blur-md z-20">
         <div className="flex items-center gap-2">
-          <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors p-2 rounded-full hover:bg-muted">
+          <Link href="/" data-testid="link-reader-library" aria-label="Вернуться в библиотеку" className="text-muted-foreground hover:text-foreground transition-colors p-2 rounded-full hover:bg-muted">
             <ArrowLeft size={20} />
           </Link>
-          <button onClick={() => setShowToc(v => !v)}
+          <button data-testid="button-reader-toc" aria-label="Открыть оглавление" onClick={() => setShowToc(v => !v)}
             className={`p-2 rounded-full transition-colors ${showToc ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}>
             <List size={20} />
           </button>
@@ -379,12 +401,12 @@ export function ReaderPage() {
           </div>
         </div>
         <div className="flex-1 max-w-md mx-8 hidden md:flex items-center gap-3">
-          <span className="text-xs text-muted-foreground whitespace-nowrap">{Math.round(percent)}%</span>
+           <span data-testid="text-reader-percent" className="text-xs text-muted-foreground whitespace-nowrap">{Math.round(percent)}%</span>
           <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
             <div className="h-full bg-primary transition-all duration-300" style={{ width: `${percent}%` }} />
           </div>
         </div>
-        <Link href="/settings" className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full">
+         <Link href="/settings" data-testid="link-reader-settings" aria-label="Настройки чтения" className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full">
           <Settings size={20} />
         </Link>
       </header>
@@ -395,29 +417,30 @@ export function ReaderPage() {
           {showToc && (
             <motion.aside key="toc" initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }}
               transition={{ type: 'spring', stiffness: 320, damping: 32 }}
-              className="fixed left-0 top-14 bottom-0 w-[280px] bg-card border-r border-border flex flex-col z-30 shadow-xl">
+               className="fixed left-0 top-14 bottom-0 w-[280px] max-w-[calc(100vw-24px)] bg-card border-r border-border flex flex-col z-30 shadow-xl">
               <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
                 <span className="font-semibold text-sm flex items-center gap-2"><BookOpen size={15} className="text-primary" />Оглавление</span>
-                <button onClick={() => setShowToc(false)} className="p-1.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground"><X size={16} /></button>
+                 <button data-testid="button-close-toc" aria-label="Закрыть оглавление" onClick={() => setShowToc(false)} className="p-1.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground"><X size={16} /></button>
               </div>
               <div className="flex-1 overflow-y-auto py-2">
                 {tocEntries.length === 0
                   ? <p className="text-sm text-muted-foreground text-center py-8">Нет глав</p>
                   : tocEntries.map((entry, i) => (
-                    <button key={i} onClick={() => { setCurrentPageIdx(entry.pageIdx); closeSentencePanel(); setShowToc(false); }}
+                     <button data-testid={`button-toc-chapter-${i}`} key={i} onClick={() => { setCurrentPageIdx(entry.pageIdx); closeSentencePanel(); setShowToc(false); }}
                       className={`w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-muted/70 flex items-start gap-3 ${i === activeChapterIdx ? 'text-primary font-semibold bg-primary/5' : 'text-foreground/80'}`}>
                       <span className="text-xs text-muted-foreground mt-0.5 shrink-0 w-5 text-right">{i + 1}</span>
-                      <span className="leading-snug">{entry.title || `Глава ${i + 1}`}</span>
+                       <span className="leading-snug flex-1">{entry.title || `Глава ${i + 1}`}</span>
+                       <span className="font-mono-app text-[10px] text-muted-foreground/70">{entry.pageIdx + 1}</span>
                     </button>
                   ))}
               </div>
               <div className="p-4 border-t border-border shrink-0">
                 <p className="text-xs text-muted-foreground mb-2">Перейти на страницу</p>
                 <form onSubmit={handleJumpSubmit} className="flex gap-2">
-                  <input type="number" min={1} max={pages.length} placeholder={`1 – ${pages.length}`}
+                   <input data-testid="input-toc-page" type="number" min={1} max={pages.length} placeholder={`1 – ${pages.length}`}
                     value={jumpValue} onChange={e => setJumpValue(e.target.value)}
                     className="flex-1 text-sm border border-border rounded-lg px-3 py-2 bg-background focus:outline-none focus:ring-2 focus:ring-primary/40" />
-                  <button type="submit" className="px-4 py-2 bg-primary text-primary-foreground text-sm rounded-lg font-medium hover:bg-primary/90 transition-colors">→</button>
+                   <button data-testid="button-toc-jump" type="submit" className="px-4 py-2 bg-primary text-primary-foreground text-sm rounded-lg font-medium hover:bg-primary/90 transition-colors">Перейти</button>
                 </form>
                 <p className="text-xs text-muted-foreground mt-2 text-center">Сейчас: {currentPageIdx + 1} / {pages.length}</p>
               </div>
@@ -426,22 +449,22 @@ export function ReaderPage() {
         </AnimatePresence>
 
         {/* Reader */}
-        <main className={`flex-1 relative flex items-center justify-center overflow-hidden transition-all duration-300 ${selectedSentence ? 'mr-[380px]' : ''} ${showToc ? 'ml-[280px]' : ''}`}>
-          <button onClick={handlePrev} className="absolute left-0 top-0 bottom-0 w-[8%] md:w-14 hover:bg-foreground/[0.02] flex items-center justify-center transition-colors text-transparent hover:text-foreground/20 z-10">
+        <main className={`flex-1 relative flex items-center justify-center overflow-hidden transition-all duration-300 ${selectedSentence ? 'md:mr-[380px]' : ''} ${showToc ? 'md:ml-[280px]' : ''}`}>
+           <button data-testid="button-reader-prev" aria-label="Предыдущая страница" onClick={handlePrev} className="absolute left-0 top-0 bottom-0 w-[8%] md:w-14 hover:bg-foreground/[0.02] flex items-center justify-center transition-colors text-transparent hover:text-foreground/20 z-10">
             <ChevronLeft size={36} />
           </button>
-          <button onClick={handleNext} className="absolute right-0 top-0 bottom-0 w-[8%] md:w-14 hover:bg-foreground/[0.02] flex items-center justify-center transition-colors text-transparent hover:text-foreground/20 z-10">
+           <button data-testid="button-reader-next" aria-label="Следующая страница" onClick={handleNext} className="absolute right-0 top-0 bottom-0 w-[8%] md:w-14 hover:bg-foreground/[0.02] flex items-center justify-center transition-colors text-transparent hover:text-foreground/20 z-10">
             <ChevronRight size={36} />
           </button>
 
-          <div className={`w-full ${widthClass} px-8 md:px-12 py-8 h-full overflow-hidden`}>
+           <div className={`w-full ${widthClass} px-6 sm:px-8 md:px-12 py-5 sm:py-8 h-full overflow-hidden`}>
             <AnimatePresence>
               {showHint && (
                 <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
                   className="mb-5 flex items-center gap-3 bg-primary/8 border border-primary/20 rounded-2xl px-4 py-3 text-sm text-foreground/80">
-                  <span className="text-base shrink-0">💡</span>
+                   <span className="text-primary shrink-0"><BookOpen size={16} /></span>
                   <span>Наведите на <span className="text-primary font-semibold">слово</span> — увидите перевод и значения. Нажмите на <span className="text-primary font-semibold">точку</span> — перевод предложения</span>
-                  <button onClick={() => { setShowHint(false); localStorage.setItem('reader-hint-dismissed', '1'); }}
+                   <button data-testid="button-dismiss-reader-hint" aria-label="Скрыть подсказку" onClick={() => { setShowHint(false); localStorage.setItem('reader-hint-dismissed', '1'); }}
                     className="ml-auto shrink-0 p-1 rounded-full hover:bg-primary/15 text-muted-foreground hover:text-foreground">
                     <X size={14} />
                   </button>
@@ -482,7 +505,7 @@ export function ReaderPage() {
                                 );
                               })}
                               {punct && (
-                                <button onClick={() => handleSentenceClick(sentence)} title="Перевести предложение"
+                                 <button data-testid={`button-translate-sentence-${currentPageIdx}-${pi}-${si}`} onClick={() => handleSentenceClick(sentence)} title="Перевести предложение"
                                   className={`inline font-bold transition-colors rounded px-[1px] cursor-pointer ${isSelected ? 'text-primary' : 'text-primary/50 hover:text-primary'}`}>
                                   {punct}
                                 </button>
@@ -507,16 +530,16 @@ export function ReaderPage() {
               className="fixed right-0 top-14 bottom-0 w-[380px] bg-card border-l border-border flex flex-col z-30 shadow-xl">
               <div className="flex items-center justify-between px-4 pt-4 pb-0 shrink-0">
                 <div className="flex gap-1 bg-muted p-1 rounded-xl">
-                  <button onClick={() => setPanelTab('translate')}
+                   <button data-testid="button-sentence-translation-tab" onClick={() => setPanelTab('translate')}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${panelTab === 'translate' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
                     <Languages size={14} /> Перевод
                   </button>
-                  <button onClick={() => setPanelTab('grammar')}
+                   <button data-testid="button-sentence-grammar-tab" onClick={() => setPanelTab('grammar')}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${panelTab === 'grammar' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
                     <Microscope size={14} /> Грамматика
                   </button>
                 </div>
-                <button onClick={closeSentencePanel} className="p-1.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground ml-2">
+               <button data-testid="button-close-sentence-panel" aria-label="Закрыть панель предложения" onClick={closeSentencePanel} className="p-1.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground ml-2">
                   <X size={16} />
                 </button>
               </div>
@@ -564,7 +587,7 @@ export function ReaderPage() {
                     )}
                     {sentenceGrammar.tip && (
                       <div className="bg-primary/5 border border-primary/15 rounded-xl p-3">
-                        <p className="text-xs text-primary font-medium mb-1">📚 {sentenceGrammar.tense}</p>
+                         <p className="text-xs text-primary font-medium mb-1">{sentenceGrammar.tense}</p>
                         <p className="text-xs text-foreground/80 leading-relaxed">{sentenceGrammar.tip}</p>
                       </div>
                     )}
@@ -577,22 +600,22 @@ export function ReaderPage() {
       </div>
 
       <footer className="h-9 shrink-0 flex items-center justify-center gap-3 text-xs text-muted-foreground border-t border-border/30">
-        <button onClick={handlePrev} disabled={currentPageIdx === 0} className="p-1 hover:text-foreground disabled:opacity-30 transition-colors"><ChevronLeft size={14} /></button>
+        <button data-testid="button-reader-footer-prev" aria-label="Предыдущая страница" onClick={handlePrev} disabled={currentPageIdx === 0} className="p-1 hover:text-foreground disabled:opacity-30 transition-colors"><ChevronLeft size={14} /></button>
         {editingPage ? (
           <form onSubmit={handleJumpSubmit} className="flex items-center gap-1">
-            <input autoFocus type="number" min={1} max={pages.length} value={jumpValue}
+           <input data-testid="input-reader-page" autoFocus type="number" min={1} max={pages.length} value={jumpValue}
               onChange={e => setJumpValue(e.target.value)}
               onBlur={() => { setEditingPage(false); setJumpValue(''); }}
               className="w-16 text-center text-xs border border-border rounded px-2 py-0.5 bg-background focus:outline-none focus:ring-1 focus:ring-primary/50" />
             <span>/ {pages.length}</span>
           </form>
         ) : (
-          <button onClick={() => { setEditingPage(true); setJumpValue(String(currentPageIdx + 1)); }}
+           <button data-testid="button-reader-page-number" onClick={() => { setEditingPage(true); setJumpValue(String(currentPageIdx + 1)); }}
             className="hover:text-foreground transition-colors hover:bg-muted px-2 py-0.5 rounded" title="Нажмите для перехода">
-            Страница {currentPageIdx + 1} из {pages.length}
+             <span data-testid="text-reader-page">Страница {currentPageIdx + 1} из {pages.length}</span>
           </button>
         )}
-        <button onClick={handleNext} disabled={currentPageIdx === pages.length - 1} className="p-1 hover:text-foreground disabled:opacity-30 transition-colors"><ChevronRight size={14} /></button>
+        <button data-testid="button-reader-footer-next" aria-label="Следующая страница" onClick={handleNext} disabled={currentPageIdx === pages.length - 1} className="p-1 hover:text-foreground disabled:opacity-30 transition-colors"><ChevronRight size={14} /></button>
       </footer>
 
       {/* Word tooltip */}

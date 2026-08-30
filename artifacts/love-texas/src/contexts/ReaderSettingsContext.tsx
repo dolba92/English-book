@@ -3,16 +3,16 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 export interface ReaderSettings {
   fontSize: number; // 12-24
   pageWidth: 'narrow' | 'medium' | 'wide';
-  fontFamily: string; // 'Inter', 'Georgia', 'Merriweather'
+  fontFamily: string; // reader font family
   lineHeight: number; // 1.4-2.2
   autoSave: boolean;
 }
 
 const defaultSettings: ReaderSettings = {
-  fontSize: 18,
+  fontSize: 17,
   pageWidth: 'medium',
-  fontFamily: 'Inter',
-  lineHeight: 1.8,
+  fontFamily: 'Source Serif 4',
+  lineHeight: 1.65,
   autoSave: true,
 };
 

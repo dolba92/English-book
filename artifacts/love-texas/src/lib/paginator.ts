@@ -11,7 +11,7 @@ export function paginateBook(chapters: BookChapter[], paragraphsPerPage = 30) {
     let currentPage: string[] = [];
     
     let currentChars = 0;
-    const MAX_CHARS_PER_PAGE = 1900; // fits one screen without scroll
+     const MAX_CHARS_PER_PAGE = 2300; // denser editorial pages; the reader never needs a scroll
 
     for (const p of chapter.paragraphs) {
       if (currentChars + p.length > MAX_CHARS_PER_PAGE && currentPage.length > 0) {

@@ -233,6 +233,7 @@ export function ReaderPage() {
   const [pages, setPages] = useState<PageData[]>([]);
   const [currentPageIdx, setCurrentPageIdx] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
 
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -253,11 +254,22 @@ export function ReaderPage() {
   saveProgressRef.current = saveProgress;
 
   useEffect(() => {
+    const handleResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
     const load = async () => {
       const b = await getBook(id);
       if (b) {
         setBook(b);
-        const { paginatedChapters } = paginateBook(b.content, 5);
+        const isMobile = window.innerWidth < 640;
+        const { paginatedChapters } = paginateBook(
+          b.content,
+          isMobile ? 4 : 6,
+          isMobile ? 1700 : 2300,
+        );
         const flat: PageData[] = [];
         paginatedChapters.forEach(ch => {
           ch.pages.forEach((p, pi) => flat.push({ title: ch.title, paragraphs: p, isChapterStart: pi === 0 }));
@@ -383,6 +395,9 @@ export function ReaderPage() {
   const percent = ((currentPageIdx + 1) / pages.length) * 100;
   const widthClass = settings.pageWidth === 'narrow' ? 'max-w-xl' : settings.pageWidth === 'wide' ? 'max-w-4xl' : 'max-w-2xl';
   const fontCss = getFontCss(settings.fontFamily);
+  const isMobile = viewportWidth < 640;
+  const readerFontSize = isMobile ? Math.min(settings.fontSize, 16) : settings.fontSize;
+  const readerLineHeight = isMobile ? Math.min(settings.lineHeight, 1.5) : settings.lineHeight;
 
   return (
     <div className="min-h-0 h-[calc(100dvh-64px)] md:min-h-[100dvh] md:h-[100dvh] bg-background text-foreground flex flex-col selection:bg-primary/20 overflow-hidden">
@@ -474,7 +489,7 @@ export function ReaderPage() {
 
             <AnimatePresence mode="wait">
               <motion.div key={currentPageIdx} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }}
-                style={{ fontSize: `${settings.fontSize}px`, lineHeight: settings.lineHeight, fontFamily: fontCss }}>
+               style={{ fontSize: `${readerFontSize}px`, lineHeight: readerLineHeight, fontFamily: fontCss }}>
                 {page.isChapterStart && page.title && (
                   <h2 className="font-serif text-center font-bold mb-6 text-primary/60 text-[1.1em]">{page.title}</h2>
                 )}

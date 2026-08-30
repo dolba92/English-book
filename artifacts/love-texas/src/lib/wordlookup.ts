@@ -26,7 +26,7 @@ function posRu(en: string): string {
 }
 
 // ── Cache ─────────────────────────────────────────────────────────────────────
-const CACHE_PREFIX = 'ltx4-word-';
+const CACHE_PREFIX = 'ltx5-word-';
 
 function readCache(key: string): WordInfo | null {
   try {

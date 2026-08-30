@@ -21,7 +21,11 @@ export function LibraryPage() {
       const booksWithProgress = await Promise.all(
         allBooks.map(async (book) => {
           const prog = await getProgress(book.id!);
-          return { book, progress: prog?.percentComplete || 0 };
+          const actualPageCount = paginateBook(book.content, 6).totalPages;
+          return {
+            book: { ...book, totalPages: actualPageCount },
+            progress: prog?.percentComplete || 0,
+          };
         })
       );
       setBooks(booksWithProgress.sort((a, b) => b.book.addedAt - a.book.addedAt));
@@ -44,7 +48,7 @@ export function LibraryPage() {
           level: "A2",
           fileSizeKb: 10,
           addedAt: Date.now(),
-          totalPages: 3,
+           totalPages: 2,
           content: [
             {
               title: "Chapter 1",

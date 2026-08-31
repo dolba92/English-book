@@ -5,7 +5,6 @@ import { defineConfig } from 'vite';
 
 import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
 
-// Значения по умолчанию, если переменные не заданы
 const port = parseInt(process.env.PORT || '5173', 10);
 const basePath = process.env.BASE_PATH || '/';
 
@@ -43,7 +42,7 @@ export default defineConfig({
   },
   root: path.resolve(import.meta.dirname),
   build: {
-    outDir: path.resolve(import.meta.dirname, 'dist/public'),
+    outDir: path.resolve(import.meta.dirname, 'dist'), // ✅ ИСПРАВЛЕНО
     emptyOutDir: true,
   },
   server: {

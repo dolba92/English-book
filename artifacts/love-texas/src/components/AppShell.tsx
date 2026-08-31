@@ -2,10 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { BookOpen, BookMarked, Brain, BarChart2, Settings, Heart, Sparkles } from 'lucide-react';
 import { getTheme, applyTheme } from '@/lib/theme';
+import { useReaderSettings } from '@/contexts/ReaderSettingsContext';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [mounted, setMounted] = useState(false);
+  const { settings } = useReaderSettings();
 
   useEffect(() => {
     const t = getTheme();
@@ -24,7 +26,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (!mounted) return null;
 
   return (
-    <div className="paper-grain min-h-[100dvh] flex flex-col md:flex-row bg-background transition-colors duration-300">
+    <div className="app-shell paper-grain min-h-[100dvh] flex flex-col md:flex-row bg-background transition-colors duration-300" style={{ backgroundColor: settings.backgroundColor }}>
       <nav className="md:w-[232px] bg-sidebar border-r border-sidebar-border flex md:flex-col px-3 py-3 md:p-4 md:sticky md:top-0 md:h-[100dvh] z-20 shrink-0 shadow-[4px_0_24px_rgba(57,35,26,.18)]">
         <div className="hidden md:flex items-center gap-3 px-2 py-4 mb-7">
           <div className="w-9 h-9 rounded-[11px] bg-sidebar-primary text-sidebar-primary-foreground flex items-center justify-center shadow-sm">
@@ -53,7 +55,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
       
-      <main className="flex-1 w-full min-h-full max-w-full overflow-x-hidden relative">
+      <main className="flex-1 w-full min-h-full max-w-full overflow-x-hidden relative" style={{ backgroundColor: settings.backgroundColor }}>
         {children}
       </main>
     </div>

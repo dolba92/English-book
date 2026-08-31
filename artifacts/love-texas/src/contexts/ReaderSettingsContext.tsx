@@ -1,11 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 export interface ReaderSettings {
-  fontSize: number; // 12-24
+  fontSize: number; // 12-36
   pageWidth: 'narrow' | 'medium' | 'wide';
   fontFamily: string; // reader font family
-  lineHeight: number; // 1.4-2.2
+  lineHeight: number; // 1.3-2.6
+  paragraphSpacing: number; // em
+  textAlign: 'left' | 'justify';
   textColor: string; // reading text color
+  backgroundColor: string; // app and reader background
   autoSave: boolean;
 }
 
@@ -14,7 +17,10 @@ const defaultSettings: ReaderSettings = {
   pageWidth: 'medium',
   fontFamily: 'Source Serif 4',
   lineHeight: 1.65,
+  paragraphSpacing: 0.8,
+  textAlign: 'justify',
   textColor: '#4b2924',
+  backgroundColor: '#f0c8d5',
   autoSave: true,
 };
 

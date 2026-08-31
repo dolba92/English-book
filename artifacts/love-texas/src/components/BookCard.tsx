@@ -37,7 +37,7 @@ export function BookCard({ book, progress = 0, onDelete }: BookCardProps) {
       data-testid={`card-book-${book.id}`}
     >
       {/* Cover */}
-       <div className="relative w-full overflow-hidden bg-muted" style={{ paddingBottom: '140%' }}>
+        <div className="relative w-full overflow-hidden bg-muted" style={{ paddingBottom: '120%' }}>
         <div className="absolute inset-0 book-spine">
           {book.coverUrl ? (
             <img
@@ -80,13 +80,13 @@ export function BookCard({ book, progress = 0, onDelete }: BookCardProps) {
       </div>
 
       {/* Info */}
-      <div className="p-4 flex flex-col gap-1">
-        <h3 data-testid={`text-book-title-${book.id}`} className="font-editorial font-semibold text-[17px] text-foreground line-clamp-1" title={book.title}>
+        <div className="p-2.5 flex flex-col gap-1">
+        <h3 data-testid={`text-book-title-${book.id}`} className="font-editorial font-semibold text-[15px] text-foreground line-clamp-1" title={book.title}>
           {book.title}
         </h3>
         <p data-testid={`text-book-author-${book.id}`} className="text-xs text-muted-foreground line-clamp-1">{book.author}</p>
 
-        <div className="mt-3">
+        <div className="mt-2">
           <div className="flex justify-between text-[11px] text-muted-foreground mb-1.5">
             <span className="flex items-center gap-1"><FileText size={12} />{book.totalPages} страниц</span>
             <span data-testid={`text-book-progress-${book.id}`}>{Math.round(progress)}%</span>
@@ -98,7 +98,7 @@ export function BookCard({ book, progress = 0, onDelete }: BookCardProps) {
             />
           </div>
         </div>
-        <Link href={`/reader/${book.id}`} data-testid={`link-open-book-${book.id}`} className="mt-3 text-xs font-semibold text-primary flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+        <Link href={`/reader/${book.id}`} data-testid={`link-open-book-${book.id}`} className="mt-2 text-xs font-semibold text-primary flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
           {progress > 0 ? 'Продолжить чтение' : 'Открыть книгу'} <ArrowUpRight size={13} />
         </Link>
       </div>

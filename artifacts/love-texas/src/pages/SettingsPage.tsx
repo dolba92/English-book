@@ -80,7 +80,7 @@ export function SettingsPage() {
                 <span>Размер шрифта</span>
                 <span className="text-muted-foreground">{settings.fontSize} пт</span>
               </label>
-               <input data-testid="input-reader-font-size" type="range" min="12" max="28" step="1" value={settings.fontSize}
+               <input data-testid="input-reader-font-size" type="range" min="12" max="36" step="1" value={settings.fontSize}
                 onChange={e => updateSettings({ fontSize: parseInt(e.target.value) })}
                 className="w-full accent-primary h-2 bg-muted rounded-lg appearance-none cursor-pointer" />
             </div>
@@ -89,10 +89,31 @@ export function SettingsPage() {
                 <span>Межстрочный интервал</span>
                 <span className="text-muted-foreground">{settings.lineHeight}×</span>
               </label>
-               <input data-testid="input-reader-line-height" type="range" min="1.3" max="2.3" step="0.1" value={settings.lineHeight}
+               <input data-testid="input-reader-line-height" type="range" min="1.3" max="2.6" step="0.1" value={settings.lineHeight}
                 onChange={e => updateSettings({ lineHeight: parseFloat(e.target.value) })}
                 className="w-full accent-primary h-2 bg-muted rounded-lg appearance-none cursor-pointer" />
             </div>
+             <div>
+               <label className="flex justify-between text-sm font-medium mb-3">
+                 <span>Расстояние между абзацами</span>
+                 <span className="text-muted-foreground">{settings.paragraphSpacing.toFixed(1)}×</span>
+               </label>
+               <input data-testid="input-reader-paragraph-spacing" type="range" min="0.3" max="2" step="0.1" value={settings.paragraphSpacing}
+                 onChange={e => updateSettings({ paragraphSpacing: parseFloat(e.target.value) })}
+                 className="w-full accent-primary h-2 bg-muted rounded-lg appearance-none cursor-pointer" />
+             </div>
+             <div className="flex items-center justify-between gap-4">
+               <label className="text-sm font-medium">Выравнивание текста</label>
+               <div className="flex bg-muted p-1 rounded-xl">
+                 {[{ value: 'left', label: 'По левому краю' }, { value: 'justify', label: 'По ширине' }].map(option => (
+                   <button data-testid={`button-reader-align-${option.value}`} type="button" key={option.value}
+                     onClick={() => updateSettings({ textAlign: option.value as 'left' | 'justify' })}
+                     className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${settings.textAlign === option.value ? 'bg-card text-foreground shadow-sm font-medium' : 'text-muted-foreground hover:text-foreground'}`}>
+                     {option.label}
+                   </button>
+                 ))}
+               </div>
+             </div>
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium">Ширина страницы</label>
                <div className="flex flex-wrap bg-muted p-1 rounded-xl">
@@ -153,6 +174,35 @@ export function SettingsPage() {
                     className="h-5 w-6 cursor-pointer rounded border-0 bg-transparent p-0"
                     aria-label="Выбрать цвет текста"
                   />
+                </label>
+              </div>
+            </div>
+            <div className="border-t border-border pt-6">
+              <div className="flex items-start justify-between gap-4 mb-3">
+                <div>
+                  <label className="text-sm font-medium block">Цвет фона приложения</label>
+                  <p className="text-xs text-muted-foreground mt-1">Настраивает фон страниц и открытой книги.</p>
+                </div>
+                <span className="h-6 w-6 rounded-full border border-foreground/20" style={{ backgroundColor: settings.backgroundColor }} />
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {[
+                  { value: '#f0c8d5', label: 'Розовый туман' },
+                  { value: '#e4a7bc', label: 'Розовая бумага' },
+                  { value: '#6b3934', label: 'Шоколадный' },
+                  { value: '#fff8f5', label: 'Белый' },
+                ].map(color => (
+                  <button key={color.value} type="button" onClick={() => updateSettings({ backgroundColor: color.value })}
+                    className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs transition-colors ${settings.backgroundColor === color.value ? 'border-primary bg-primary/10 text-foreground' : 'border-border hover:border-primary/50'}`}>
+                    <span className="h-4 w-4 rounded-full border border-foreground/20" style={{ backgroundColor: color.value }} />
+                    {color.label}
+                  </button>
+                ))}
+                <label className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-xs cursor-pointer hover:border-primary/50">
+                  Свой цвет
+                  <input data-testid="input-app-background-color" type="color" value={settings.backgroundColor}
+                    onChange={e => updateSettings({ backgroundColor: e.target.value })}
+                    className="h-5 w-6 cursor-pointer rounded border-0 bg-transparent p-0" aria-label="Выбрать цвет фона" />
                 </label>
               </div>
             </div>

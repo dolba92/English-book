@@ -132,12 +132,12 @@ export function LibraryPage() {
       <div className="absolute -top-24 -right-28 w-80 h-80 rounded-full bg-accent/25 blur-3xl pointer-events-none" />
       <div className="relative mb-10 flex flex-col xl:flex-row xl:items-end justify-between gap-7">
         <div className="max-w-2xl">
-          <div className="flex items-center gap-2 text-primary text-xs font-bold uppercase tracking-[.2em] mb-4">
+          <div className="flex items-center gap-2 text-white text-xs font-bold uppercase tracking-[.2em] mb-4">
             <LibraryBig size={15} /> Личная полка
           </div>
-           <h1 data-testid="text-library-title" className="font-editorial text-5xl sm:text-6xl font-semibold tracking-[-.04em] text-foreground leading-[.95]">Книги, к которым<br /><em className="text-primary not-italic">хочется вернуться</em></h1>
-           <p className="font-script text-primary text-2xl sm:text-3xl mt-4 -rotate-2">собрано для тихих вечеров</p>
-          <p className="text-muted-foreground mt-5 max-w-lg leading-relaxed">Читайте в своём ритме, отмечайте новые слова и собирайте английский, который остаётся с вами.</p>
+            <h1 data-testid="text-library-title" className="font-editorial text-5xl sm:text-6xl font-semibold tracking-[-.04em] text-white leading-[.95]">Книги, к которым<br /><em className="text-white not-italic">хочется вернуться</em></h1>
+            <p className="font-script text-white text-2xl sm:text-3xl mt-4 -rotate-2">собрано для тихих вечеров</p>
+          <p className="text-white/80 mt-5 max-w-lg leading-relaxed">Читайте в своём ритме, отмечайте новые слова и собирайте английский, который остаётся с вами.</p>
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
@@ -148,7 +148,7 @@ export function LibraryPage() {
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
              data-testid="button-add-book"
-            className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-3 rounded-xl font-semibold hover:bg-primary/90 transition-colors shadow-[0_8px_18px_hsl(var(--primary)/.22)] disabled:opacity-60"
+             className="flex items-center gap-2 bg-primary text-white px-5 py-3 rounded-xl font-semibold hover:bg-primary/90 transition-colors shadow-[0_8px_18px_hsl(var(--primary)/.22)] disabled:opacity-60"
           >
             <Plus size={18} />
             Добавить книгу
@@ -164,12 +164,12 @@ export function LibraryPage() {
       </div>
 
       <div className="flex flex-wrap gap-3 mb-6">
-        <div className="inline-flex items-center gap-2 rounded-full bg-card/70 border border-card-border px-3.5 py-2 text-xs text-muted-foreground"><BookOpen size={14} className="text-primary" /><span data-testid="text-library-count">{books.length} {books.length === 1 ? 'книга' : 'книг'}</span></div>
-        <div className="inline-flex items-center gap-2 rounded-full bg-card/70 border border-card-border px-3.5 py-2 text-xs text-muted-foreground"><Clock3 size={14} className="text-primary" />Ваш тихий час для чтения</div>
+         <div className="inline-flex items-center gap-2 rounded-full bg-white/15 border border-white/35 px-3.5 py-2 text-xs text-white"><BookOpen size={14} /><span data-testid="text-library-count">{books.length} {books.length === 1 ? 'книга' : 'книг'}</span></div>
+         <div className="inline-flex items-center gap-2 rounded-full bg-white/15 border border-white/35 px-3.5 py-2 text-xs text-white"><Clock3 size={14} />Ваш тихий час для чтения</div>
       </div>
-      <div data-testid="card-reading-motivation" className="mb-7 max-w-xl flex items-start gap-3 rounded-2xl border border-accent/55 bg-accent/25 px-4 py-3.5">
-        <div className="mt-0.5 rounded-lg bg-card/70 p-2 text-primary"><Sparkles size={16} /></div>
-        <div><p className="text-sm font-semibold text-foreground">Маленький шаг тоже считается</p><p className="text-xs text-muted-foreground mt-0.5">Одна страница сегодня — это уже встреча с английским.</p></div>
+       <div data-testid="card-reading-motivation" className="mb-7 max-w-xl flex items-start gap-3 rounded-2xl border border-white/35 bg-white/15 px-4 py-3.5 text-white">
+         <div className="mt-0.5 rounded-lg bg-white/20 p-2"><Sparkles size={16} /></div>
+         <div><p className="text-sm font-semibold">Маленький шаг тоже считается</p><p className="text-xs text-white/75 mt-0.5">Одна страница сегодня — это уже встреча с английским.</p></div>
       </div>
       {error && (
         <div data-testid="status-library-error" className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-destructive/25 bg-destructive/8 px-4 py-3 text-sm text-destructive">

@@ -400,7 +400,7 @@ export function ReaderPage() {
   const readerLineHeight = isMobile ? Math.min(settings.lineHeight, 1.5) : settings.lineHeight;
 
   return (
-    <div className="min-h-0 h-[calc(100dvh-64px)] md:min-h-[100dvh] md:h-[100dvh] bg-background text-foreground flex flex-col selection:bg-primary/20 overflow-hidden">
+    <div className="min-h-0 h-[calc(100dvh-64px)] md:min-h-[100dvh] md:h-[100dvh] bg-background text-foreground flex flex-col selection:bg-primary/20 overflow-hidden" style={{ backgroundColor: settings.backgroundColor }}>
       <header className="h-14 flex items-center justify-between px-4 border-b border-border/40 shrink-0 sticky top-0 bg-background/90 backdrop-blur-md z-20">
         <div className="flex items-center gap-2">
           <Link href="/" data-testid="link-reader-library" aria-label="Вернуться в библиотеку" className="text-muted-foreground hover:text-foreground transition-colors p-2 rounded-full hover:bg-muted">
@@ -493,11 +493,11 @@ export function ReaderPage() {
                 {page.isChapterStart && page.title && (
                   <h2 className="font-serif text-center font-bold mb-6 text-primary/60 text-[1.1em]">{page.title}</h2>
                 )}
-                <div className="space-y-2">
+                <div className="flex flex-col" style={{ gap: `${settings.paragraphSpacing}em` }}>
                   {page.paragraphs.map((para, pi) => {
                     const sentences = splitSentences(para);
                     return (
-                      <p key={pi} className="text-foreground/90 text-justify" style={{ color: settings.textColor }}>
+                      <p key={pi} className={`text-foreground/90 ${settings.textAlign === 'justify' ? 'text-justify' : 'text-left'}`} style={{ color: settings.textColor }}>
                         {sentences.map((sentence, si) => {
                           const punctMatch = sentence.match(/^([\s\S]*?)([.!?…]+["'»]?\s*)$/);
                           const body = punctMatch ? punctMatch[1] : sentence;

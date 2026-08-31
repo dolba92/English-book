@@ -5,7 +5,7 @@ import { clearAllData, clearDictionary } from '@/lib/storage';
 import { FONTS } from '@/lib/fonts';
 import { getSRSSettings, saveSRSSettings, SRSSettings } from '@/lib/srs';
 import { motion } from 'framer-motion';
-import { Trash2, CheckCircle2, BrainCircuit } from 'lucide-react';
+import { Trash2, CheckCircle2, BrainCircuit, Moon, Paintbrush } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export function SettingsPage() {
@@ -49,16 +49,17 @@ export function SettingsPage() {
         {/* Тема */}
         <section>
            <h2 className="font-editorial text-2xl font-semibold mb-4">Тема оформления</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { id: 'light',  name: 'Светлая',   bg: 'bg-[#faf9f6]',  border: 'border-gray-200',   text: 'text-gray-900' },
-              { id: 'pink',   name: 'Love Texas', bg: 'bg-[#fff5f6]',  border: 'border-pink-200',   text: 'text-pink-950' },
-              { id: 'cream',  name: 'Кремовая',   bg: 'bg-[#f4ebd8]',  border: 'border-[#e6d5b8]',  text: 'text-[#4a3f35]' },
+              { id: 'light',  name: 'Бумага',   bg: 'bg-[#fffaf7]',  border: 'border-[#ead7d2]',   text: 'text-[#4b2924]' },
+              { id: 'pink',   name: 'Розовая', bg: 'bg-[#fff0f4]',  border: 'border-[#e8b6c5]',   text: 'text-[#682f42]' },
+               { id: 'cream',  name: 'Шоколадная', bg: 'bg-[#4b2924]',  border: 'border-[#8f3f5d]',  text: 'text-[#fff8f5]' },
+              { id: 'dark',   name: 'Ночная',   bg: 'bg-[#241512]',  border: 'border-[#6d4353]',  text: 'text-[#fff8f5]' },
             ].map(t => (
               <div data-testid={`button-theme-${t.id}`} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleThemeChange(t.id as Theme)} key={t.id} onClick={() => handleThemeChange(t.id as Theme)}
                 className={`relative cursor-pointer rounded-2xl p-4 border-2 transition-all ${t.bg} ${t.border} ${currentTheme === t.id ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : 'hover:scale-[1.02]'}`}>
                 <div className="flex justify-between items-center mb-4">
-                  <span className={`font-bold ${t.text}`}>{t.name}</span>
+                  <span className={`font-bold flex items-center gap-2 ${t.text}`}>{t.id === 'dark' && <Moon size={15} />}{t.name}</span>
                   {currentTheme === t.id && <CheckCircle2 className={t.text} size={20} />}
                 </div>
                 <div className="space-y-2 opacity-70">
@@ -113,6 +114,46 @@ export function SettingsPage() {
                     {f.label}
                   </button>
                 ))}
+              </div>
+            </div>
+            <div className="border-t border-border pt-6">
+              <div className="flex items-start justify-between gap-4 mb-3">
+                <div>
+                  <label className="text-sm font-medium block">Цвет текста</label>
+                  <p className="text-xs text-muted-foreground mt-1">Отдельно для страниц открытой книги.</p>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Paintbrush size={15} className="text-primary" />
+                  <span>{settings.textColor.toUpperCase()}</span>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {[
+                  { value: '#4b2924', label: 'Шоколадный' },
+                  { value: '#8f3f5d', label: 'Розовый' },
+                  { value: '#fff8f5', label: 'Белый' },
+                ].map(color => (
+                  <button
+                    key={color.value}
+                    type="button"
+                    onClick={() => updateSettings({ textColor: color.value })}
+                    className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs transition-colors ${settings.textColor === color.value ? 'border-primary bg-primary/10 text-foreground' : 'border-border hover:border-primary/50'}`}
+                  >
+                    <span className="h-4 w-4 rounded-full border border-foreground/20" style={{ backgroundColor: color.value }} />
+                    {color.label}
+                  </button>
+                ))}
+                <label className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-xs cursor-pointer hover:border-primary/50">
+                  Свой цвет
+                  <input
+                    data-testid="input-reader-text-color"
+                    type="color"
+                    value={settings.textColor}
+                    onChange={e => updateSettings({ textColor: e.target.value })}
+                    className="h-5 w-6 cursor-pointer rounded border-0 bg-transparent p-0"
+                    aria-label="Выбрать цвет текста"
+                  />
+                </label>
               </div>
             </div>
           </div>

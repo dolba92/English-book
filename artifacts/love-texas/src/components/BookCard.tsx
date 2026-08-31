@@ -25,7 +25,7 @@ export function BookCard({ book, progress = 0, onDelete }: BookCardProps) {
     e.preventDefault();
     e.stopPropagation();
     if (book.id !== undefined && onDelete) {
-      onDelete(book.id);
+      if (window.confirm(`Удалить «${book.title}» с полки?`)) onDelete(book.id);
     }
   };
 
@@ -33,11 +33,11 @@ export function BookCard({ book, progress = 0, onDelete }: BookCardProps) {
     <motion.div
       whileHover={{ y: -4 }}
       transition={{ duration: 0.2 }}
-      className="group flex flex-col bg-card/90 rounded-[18px] overflow-hidden shadow-[0_10px_24px_rgba(57,35,26,.08)] hover:shadow-[0_16px_32px_rgba(57,35,26,.14)] border border-card-border transition-shadow"
+      className="group flex w-full min-w-0 flex-col bg-card/95 rounded-[14px] overflow-hidden shadow-[0_10px_24px_rgba(57,35,26,.14)] hover:shadow-[0_16px_32px_rgba(57,35,26,.22)] border border-card-border transition-shadow"
       data-testid={`card-book-${book.id}`}
     >
       {/* Cover */}
-      <div className="relative w-full overflow-hidden bg-muted" style={{ paddingBottom: '150%' }}>
+       <div className="relative w-full overflow-hidden bg-muted" style={{ paddingBottom: '140%' }}>
         <div className="absolute inset-0 book-spine">
           {book.coverUrl ? (
             <img

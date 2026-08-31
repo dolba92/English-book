@@ -5,6 +5,7 @@ export interface ReaderSettings {
   pageWidth: 'narrow' | 'medium' | 'wide';
   fontFamily: string; // reader font family
   lineHeight: number; // 1.4-2.2
+  textColor: string; // reading text color
   autoSave: boolean;
 }
 
@@ -13,6 +14,7 @@ const defaultSettings: ReaderSettings = {
   pageWidth: 'medium',
   fontFamily: 'Source Serif 4',
   lineHeight: 1.65,
+  textColor: '#4b2924',
   autoSave: true,
 };
 

@@ -127,7 +127,7 @@ export function LibraryPage() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="relative min-h-[100dvh] p-5 sm:p-8 lg:p-12 max-w-[1500px] mx-auto"
+      className="library-page relative min-h-[100dvh] p-5 sm:p-8 lg:p-12 max-w-[1500px] mx-auto"
     >
       <div className="absolute -top-24 -right-28 w-80 h-80 rounded-full bg-accent/25 blur-3xl pointer-events-none" />
       <div className="relative mb-10 flex flex-col xl:flex-row xl:items-end justify-between gap-7">
@@ -135,7 +135,8 @@ export function LibraryPage() {
           <div className="flex items-center gap-2 text-primary text-xs font-bold uppercase tracking-[.2em] mb-4">
             <LibraryBig size={15} /> Личная полка
           </div>
-          <h1 data-testid="text-library-title" className="font-editorial text-5xl sm:text-6xl font-semibold tracking-[-.04em] text-foreground leading-[.95]">Книги, к которым<br /><em className="text-primary not-italic">хочется вернуться</em></h1>
+           <h1 data-testid="text-library-title" className="font-editorial text-5xl sm:text-6xl font-semibold tracking-[-.04em] text-foreground leading-[.95]">Книги, к которым<br /><em className="text-primary not-italic">хочется вернуться</em></h1>
+           <p className="font-script text-primary text-2xl sm:text-3xl mt-4 -rotate-2">собрано для тихих вечеров</p>
           <p className="text-muted-foreground mt-5 max-w-lg leading-relaxed">Читайте в своём ритме, отмечайте новые слова и собирайте английский, который остаётся с вами.</p>
         </div>
 
@@ -176,14 +177,14 @@ export function LibraryPage() {
         </div>
       )}
       {loading ? (
-        <div className="shelf-lines rounded-2xl p-5 sm:p-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-5">
+        <div className="bookshelf shelf-lines rounded-2xl bookshelf-grid">
           {[1, 2, 3, 4, 5].map(i => (
-            <div key={i} className="rounded-[16px] bg-muted/70 animate-pulse aspect-[2/3.05]" />
+            <div key={i} className="shelf-cell"><div className="w-full rounded-[12px] bg-muted/70 animate-pulse aspect-[2/3.05]" /></div>
           ))}
         </div>
       ) : books.length > 0 ? (
         <AnimatePresence>
-          <div className="shelf-lines rounded-2xl p-5 sm:p-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-4 sm:gap-x-6 gap-y-8">
+          <div className="bookshelf shelf-lines rounded-2xl bookshelf-grid sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {books.map((item, idx) => (
               <motion.div
                 key={item.book.id}
@@ -191,6 +192,7 @@ export function LibraryPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ delay: idx * 0.04 }}
+                className="shelf-cell"
               >
                 <BookCard
                   book={item.book}

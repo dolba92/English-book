@@ -497,7 +497,7 @@ export function ReaderPage() {
                   {page.paragraphs.map((para, pi) => {
                     const sentences = splitSentences(para);
                     return (
-                      <p key={pi} className="text-foreground/90 text-justify">
+                      <p key={pi} className="text-foreground/90 text-justify" style={{ color: settings.textColor }}>
                         {sentences.map((sentence, si) => {
                           const punctMatch = sentence.match(/^([\s\S]*?)([.!?…]+["'»]?\s*)$/);
                           const body = punctMatch ? punctMatch[1] : sentence;

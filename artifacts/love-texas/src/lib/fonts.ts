@@ -9,7 +9,8 @@ export const FONTS: FontOption[] = [
   { label: 'Source Serif', value: 'Source Serif 4', css: '"Source Serif 4", serif' },
   { label: 'Georgia', value: 'Georgia', css: 'Georgia, serif' },
   { label: 'Fraunces', value: 'Fraunces', css: 'Fraunces, serif' },
-  { label: 'Source Serif italic', value: 'Source Serif italic', css: '"Source Serif 4", serif' },
+  { label: 'Fraunces italic', value: 'Fraunces italic', css: 'Fraunces, serif' },
+  { label: 'Caveat — рукописный', value: 'Caveat', css: 'Caveat, cursive' },
   { label: 'Space Mono', value: 'Space Mono', css: '"Space Mono", monospace' },
 ];
 

@@ -25,7 +25,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="paper-grain min-h-[100dvh] flex flex-col md:flex-row bg-background transition-colors duration-300">
-      <nav className="md:w-[232px] bg-sidebar border-r border-sidebar-border flex md:flex-col px-3 py-3 md:p-4 md:sticky md:top-0 md:h-[100dvh] z-20 shrink-0 shadow-[4px_0_24px_rgba(57,35,26,.06)]">
+      <nav className="md:w-[232px] bg-sidebar border-r border-sidebar-border flex md:flex-col px-3 py-3 md:p-4 md:sticky md:top-0 md:h-[100dvh] z-20 shrink-0 shadow-[4px_0_24px_rgba(57,35,26,.18)]">
         <div className="hidden md:flex items-center gap-3 px-2 py-4 mb-7">
           <div className="w-9 h-9 rounded-[11px] bg-sidebar-primary text-sidebar-primary-foreground flex items-center justify-center shadow-sm">
             <Heart size={18} fill="currentColor" />
@@ -38,8 +38,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex w-full md:flex-col gap-1.5 overflow-x-auto md:overflow-visible no-scrollbar pb-0">
           {navItems.map((item) => {
             const isActive = location === item.href || (item.href !== '/' && location.startsWith(item.href));
-            return (
-              <Link key={item.href} href={item.href} className={`group flex min-w-[64px] flex-1 md:flex-none items-center justify-center md:justify-start gap-3 px-2 md:px-3 py-2.5 rounded-xl transition-all duration-200 ${isActive ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm' : 'text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground'}`} data-testid={`nav-${item.shortLabel.toLowerCase()}`}>
+             return (
+              <Link key={item.href} href={item.href} aria-current={isActive ? 'page' : undefined} className={`group flex min-w-[64px] flex-1 md:flex-none items-center justify-center md:justify-start gap-3 px-2 md:px-3 py-2.5 rounded-xl transition-all duration-200 ${isActive ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-[0_8px_18px_hsl(var(--sidebar-primary)/.2)]' : 'text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground'}`} data-testid={`nav-${item.shortLabel.toLowerCase()}`}>
                 <item.icon size={18} className="shrink-0" />
                 <span className="hidden md:block text-sm">{item.label}</span>
                 <span className="md:hidden text-[10px] font-medium">{item.shortLabel}</span>

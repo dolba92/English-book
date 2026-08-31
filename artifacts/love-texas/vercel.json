@@ -1,7 +1,7 @@
 {
   "rewrites": [
     {
-      "source": "/(.*)",   // ✅ ПРАВИЛЬНО
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]
